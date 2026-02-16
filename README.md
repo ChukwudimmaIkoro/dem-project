@@ -136,6 +136,6 @@ lib/
 
 ## Built With
 
-15 hours of focused development. Production-ready code. Zero technical debt.
+15 hours of focused development.
 
 ---
