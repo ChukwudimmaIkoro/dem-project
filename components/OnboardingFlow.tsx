@@ -73,7 +73,17 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     <div className="min-h-screen p-4 flex flex-col">
       {/* Header */}
       <div className="text-center mb-8 mt-8">
-        <div className="text-6xl mb-4">💪</div>
+        <div className="flex items-center justify-center gap-4 mb-4">
+          <div className="text-6xl">💪</div>
+          <div className="flex flex-col items-center">
+            <img 
+              src="/qr-code.png" 
+              alt="Scan to demo" 
+              className="w-20 h-20 rounded-lg border-2 border-gray-200"
+            />
+            <p className="text-xs text-gray-500 mt-1">Scan to demo</p>
+          </div>
+        </div>
         <h1 className="text-4xl font-bold text-dem-green-600 mb-2">Dem</h1>
         <p className="text-gray-600">Diet · Exercise · Mentality</p>
       </div>
