@@ -194,6 +194,14 @@ export function generateThreeDayPlan(user: UserProfile, energyLevels?: [EnergyLe
 }
 
 /**
+ * Shuffle meals for a single day — reuses same pool/energy, just re-randomizes picks.
+ * Called when the user clicks the dice icon.
+ */
+export function shuffleDietMeals(userFoods: string[], energyLevel: EnergyLevel, dayNumber: number): DietPlan {
+  return generateDietPlan(userFoods, energyLevel, dayNumber);
+}
+
+/**
  * Check if a day is fully completed
  */
 export function isDayComplete(day: DayPlan): boolean {

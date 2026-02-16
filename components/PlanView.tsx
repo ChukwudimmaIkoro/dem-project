@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ThreeDayPlan, DayPlan, EnergyLevel } from '@/types';
 import { loadAppState, updatePlan, clearAppState, saveCurrentPlan, hasShownEnergyModal, saveEnergyModalShown } from '@/lib/storage';
-import { isDayComplete, calculateStreak, generateThreeDayPlan } from '@/lib/planGenerator';
+import { isDayComplete, calculateStreak, generateThreeDayPlan, shuffleDietMeals } from '@/lib/planGenerator';
 import { Button } from './Button';
 import { Card } from './Card';
 import { Check, Flame, RotateCcw, Utensils, Dumbbell, Brain, Sunrise, Sun, Moon, Coffee, Sparkles } from 'lucide-react';
@@ -11,6 +11,8 @@ import BottomNav from './BottomNav';
 import PillarTabs from './PillarTabs';
 import EnergyModal from './EnergyModal';
 import Mascot from './Mascot';
+import AIRecipeCard from './AIRecipeCard';
+import AIHealthInsights from './AIHealthInsights';
 
 interface PlanViewProps {
   onReset: () => void;
@@ -25,8 +27,11 @@ export default function PlanView({ onReset }: PlanViewProps) {
   const [showEnergyModal, setShowEnergyModal] = useState(false);
   const [energySetMessage, setEnergySetMessage] = useState('');
   const [userName, setUserName] = useState<string>('');
+  const [userFoods, setUserFoods] = useState<string[]>([]);
   const [lastPillar, setLastPillar] = useState<'diet' | 'exercise' | 'mentality'>('diet');
   const [tabMessage, setTabMessage] = useState('');
+  const [showDayWarning, setShowDayWarning] = useState(false);
+  const [pendingDayIdx, setPendingDayIdx] = useState<number | null>(null);
 
   useEffect(() => {
     const state = loadAppState();
@@ -40,6 +45,9 @@ export default function PlanView({ onReset }: PlanViewProps) {
       // Load user name
       if (state.user?.name) {
         setUserName(state.user.name);
+      }
+      if (state.user?.selectedFoods) {
+        setUserFoods(state.user.selectedFoods);
       }
       
       // Show energy modal if not shown for this day yet
@@ -148,8 +156,19 @@ export default function PlanView({ onReset }: PlanViewProps) {
   };
 
   const handleDayChange = (dayIdx: number) => {
+    // If moving FORWARD and current day is incomplete, warn
+    if (dayIdx > currentDayIndex && !isDayComplete(plan!.days[currentDayIndex])) {
+      setPendingDayIdx(dayIdx);
+      setShowDayWarning(true);
+      return;
+    }
+    commitDayChange(dayIdx);
+  };
+
+  const commitDayChange = (dayIdx: number) => {
     setCurrentDayIndex(dayIdx);
-    // Show energy modal only if not shown for this day before
+    setShowDayWarning(false);
+    setPendingDayIdx(null);
     const dayNumber = plan!.days[dayIdx].dayNumber;
     if (!hasShownEnergyModal(dayNumber) && !isDayComplete(plan!.days[dayIdx])) {
       setTimeout(() => setShowEnergyModal(true), 300);
@@ -190,28 +209,42 @@ export default function PlanView({ onReset }: PlanViewProps) {
   }
 
   if (activeBottomTab === 'progress') {
+    const energyHistory = plan.days.map(d => d.energyLevel);
+    const completionHistory = plan.days.map(d => d.completed);
+
     return (
       <div className="min-h-screen pb-20 p-4">
-        <div className="text-center mt-8">
-          <Mascot message="Look at you go! Keep crushing it!" mood="excited" className="mb-6" />
-          <Card className="mb-6">
+        <div className="mt-8">
+          <div className="flex justify-center">
+            <Mascot message="Look at you go! Keep crushing it!" mood="excited" currentEnergy={currentDay?.energyLevel || 'medium'} userName={userName} className="mb-6" />
+          </div>
+          <Card className="mb-4">
             <div className="flex items-center justify-center gap-2 mb-4">
               <Flame className="w-12 h-12 text-dem-orange-500" />
               <span className="text-5xl font-bold text-dem-orange-500">{streak}</span>
             </div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Day Streak!</h3>
-            <p className="text-gray-600">You've completed {streak} day{streak !== 1 ? 's' : ''}</p>
+            <h3 className="text-xl font-bold text-gray-800 mb-2 text-center">Day Streak!</h3>
+            <p className="text-gray-600 text-center">You've completed {streak} day{streak !== 1 ? 's' : ''}</p>
           </Card>
 
           {streak >= 3 && (
-            <Card className="bg-gradient-to-r from-dem-yellow-400 to-dem-orange-500 text-white">
-              <div className="text-4xl mb-2">🎉</div>
-              <h3 className="text-xl font-bold mb-2">Achievement Unlocked!</h3>
-              <p className="text-sm opacity-90">
+            <Card className="bg-gradient-to-r from-dem-yellow-400 to-dem-orange-500 text-white mb-4">
+              <div className="text-4xl mb-2 text-center">🎉</div>
+              <h3 className="text-xl font-bold mb-2 text-center">Achievement Unlocked!</h3>
+              <p className="text-sm opacity-90 text-center">
                 You've completed your 3-day journey! Ready for 5 days? (Coming soon!)
               </p>
             </Card>
           )}
+
+          {/* AI Health Insights */}
+          <AIHealthInsights
+            energyHistory={energyHistory}
+            completionHistory={completionHistory}
+            userName={userName}
+            streak={streak}
+            currentDayNumber={currentDay.dayNumber}
+          />
         </div>
         <BottomNav activeTab={activeBottomTab} onTabChange={setActiveBottomTab} />
       </div>
@@ -228,6 +261,37 @@ export default function PlanView({ onReset }: PlanViewProps) {
         onSelect={handleEnergySelect}
         dayNumber={currentDay.dayNumber}
       />
+
+      {/* Incomplete Day Warning Modal */}
+      {showDayWarning && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full animate-bounce-in shadow-2xl">
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-3">⚠️</div>
+              <h3 className="text-lg font-bold text-gray-800 mb-2">
+                Day {currentDay.dayNumber} isn't done yet!
+              </h3>
+              <p className="text-gray-600 text-sm">
+                You haven't completed all tasks for today. Move on to tomorrow anyway?
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowDayWarning(false); setPendingDayIdx(null); }}
+                className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-2xl font-bold text-sm active:scale-95 transition-all"
+              >
+                Stay here
+              </button>
+              <button
+                onClick={() => pendingDayIdx !== null && commitDayChange(pendingDayIdx)}
+                className="flex-1 py-3 bg-dem-green-500 text-white rounded-2xl font-bold text-sm active:scale-95 transition-all"
+              >
+                Move on
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header with streak and mascot */}
       <div className="flex justify-between items-start mb-6 mt-4">
@@ -291,12 +355,16 @@ export default function PlanView({ onReset }: PlanViewProps) {
           title="Click to change energy level"
         >
           <Mascot 
-            message={energySetMessage || tabMessage} // Show energy message or tab message, then idle
+            message={energySetMessage || tabMessage}
             mood={activePillar === 'mentality' ? 'encouraging' : 'happy'}
-            persistent={false} // Let it cycle through idle messages
+            persistent={false}
             key={`${activePillar}-${energySetMessage}-${tabMessage}`}
             currentEnergy={currentDay.energyLevel}
             userName={userName}
+            dayNumber={currentDay.dayNumber}
+            completedTasks={Object.entries(currentDay.completed).filter(([,v]) => v).map(([k]) => k)}
+            streak={streak}
+            pillar={activePillar}
           />
         </div>
       </div>
@@ -311,7 +379,9 @@ export default function PlanView({ onReset }: PlanViewProps) {
       {/* Pillar Content */}
       <div className="mb-6">
         {activePillar === 'diet' && (
-          <DietView day={currentDay} isCompleted={currentDay.completed.diet} onToggle={() => toggleTask('diet')} />
+          <DietView
+            key={`diet-${currentDay.dayNumber}-${currentDay.energyLevel}`}
+            day={currentDay} isCompleted={currentDay.completed.diet} onToggle={() => toggleTask('diet')} userName={userName} userFoods={userFoods} />
         )}
         {activePillar === 'exercise' && (
           <ExerciseView day={currentDay} isCompleted={currentDay.completed.exercise} onToggle={() => toggleTask('exercise')} />
@@ -340,7 +410,55 @@ export default function PlanView({ onReset }: PlanViewProps) {
 }
 
 // Sub-components for each pillar view
-function DietView({ day, isCompleted, onToggle }: { day: DayPlan; isCompleted: boolean; onToggle: () => void }) {
+// SVG Dice icon
+function DiceIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="2" y="2" width="20" height="20" rx="3" ry="3"/>
+      <circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none"/>
+      <circle cx="16" cy="8" r="1.2" fill="currentColor" stroke="none"/>
+      <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>
+      <circle cx="8" cy="16" r="1.2" fill="currentColor" stroke="none"/>
+      <circle cx="16" cy="16" r="1.2" fill="currentColor" stroke="none"/>
+    </svg>
+  );
+}
+
+function DietView({ day, isCompleted, onToggle, userName, userFoods }: {
+  day: DayPlan;
+  isCompleted: boolean;
+  onToggle: () => void;
+  userName?: string;
+  userFoods: string[];
+}) {
+  const [meals, setMeals] = useState(day.diet.meals);
+  const [spinning, setSpinning] = useState<string | null>(null);
+
+  const shuffleMeal = (mealKey: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
+    setSpinning(mealKey);
+    // Short visual delay so spin animation plays
+    setTimeout(() => {
+      const newDiet = shuffleDietMeals(userFoods, day.energyLevel, day.dayNumber);
+      setMeals(prev => ({ ...prev, [mealKey]: newDiet.meals[mealKey] }));
+      // Persist the shuffle to the plan
+      updatePlan(plan => {
+        const updated = { ...plan };
+        const dayIdx = plan.days.findIndex(d => d.dayNumber === day.dayNumber);
+        if (dayIdx !== -1) {
+          updated.days[dayIdx] = {
+            ...updated.days[dayIdx],
+            diet: {
+              ...updated.days[dayIdx].diet,
+              meals: { ...updated.days[dayIdx].diet.meals, [mealKey]: newDiet.meals[mealKey] },
+            },
+          };
+        }
+        return updated;
+      });
+      setSpinning(null);
+    }, 400);
+  };
+
   return (
     <Card className={isCompleted ? 'border-4 border-dem-yellow-400' : ''}>
       <div className="flex items-start justify-between mb-4">
@@ -353,27 +471,84 @@ function DietView({ day, isCompleted, onToggle }: { day: DayPlan; isCompleted: b
         </div>
         <button
           onClick={onToggle}
-          className={`
-            tap-target w-12 h-12 rounded-xl flex items-center justify-center transition-all
-            ${isCompleted 
-              ? 'bg-dem-green-500 text-white' 
-              : 'border-2 border-gray-300 text-gray-300 hover:border-dem-green-400'
-            }
-          `}
+          className={`tap-target w-12 h-12 rounded-xl flex items-center justify-center transition-all
+            ${isCompleted ? 'bg-dem-green-500 text-white' : 'border-2 border-gray-300 text-gray-300 hover:border-dem-green-400'}`}
         >
           {isCompleted && <Check className="w-6 h-6" />}
         </button>
       </div>
 
-      <div className="space-y-4">
-        <MealSection title="Breakfast" items={day.diet.meals.breakfast} Icon={Sunrise} />
-        <MealSection title="Lunch" items={day.diet.meals.lunch} Icon={Sun} />
-        <MealSection title="Dinner" items={day.diet.meals.dinner} Icon={Moon} />
-        {day.diet.meals.snack && day.diet.meals.snack.length > 0 && (
-          <MealSection title="Snack" items={day.diet.meals.snack} Icon={Coffee} />
-        )}
-      </div>
+      <MealSectionShuffleable
+        title="Breakfast" items={meals.breakfast} Icon={Sunrise}
+        mealKey="breakfast" spinning={spinning === 'breakfast'}
+        onShuffle={() => shuffleMeal('breakfast')}
+        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName}
+      />
+      <MealSectionShuffleable
+        title="Lunch" items={meals.lunch} Icon={Sun}
+        mealKey="lunch" spinning={spinning === 'lunch'}
+        onShuffle={() => shuffleMeal('lunch')}
+        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName}
+      />
+      <MealSectionShuffleable
+        title="Dinner" items={meals.dinner} Icon={Moon}
+        mealKey="dinner" spinning={spinning === 'dinner'}
+        onShuffle={() => shuffleMeal('dinner')}
+        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName}
+      />
+      {meals.snack && meals.snack.length > 0 && (
+        <MealSectionShuffleable
+          title="Snack" items={meals.snack} Icon={Coffee}
+          mealKey="snack" spinning={spinning === 'snack'}
+          onShuffle={() => shuffleMeal('snack')}
+          dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName}
+        />
+      )}
     </Card>
+  );
+}
+
+function MealSectionShuffleable({ title, items, Icon, mealKey, spinning, onShuffle, dayNumber, energyLevel, userName }: {
+  title: string;
+  items: string[];
+  Icon: any;
+  mealKey: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  spinning: boolean;
+  onShuffle: () => void;
+  dayNumber: number;
+  energyLevel: 'low' | 'medium' | 'high';
+  userName?: string;
+}) {
+  return (
+    <div className="mb-3">
+      <AIRecipeCard
+        foods={items || []} mealType={mealKey}
+        energyLevel={energyLevel} dayNumber={dayNumber} userName={userName}
+      />
+      <div className="bg-gray-50 p-3 rounded-xl">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Icon className="w-4 h-4 text-gray-600" />
+            <h4 className="text-sm font-bold text-gray-700">{title}</h4>
+          </div>
+          <button
+            onClick={onShuffle}
+            disabled={spinning}
+            title="Shuffle this meal"
+            className="text-gray-400 hover:text-dem-green-500 transition-colors active:scale-90 disabled:opacity-40"
+          >
+            <DiceIcon className={`w-5 h-5 transition-transform duration-300 ${spinning ? 'rotate-180 scale-125' : ''}`} />
+          </button>
+        </div>
+        <div className={`flex flex-wrap gap-2 transition-opacity duration-200 ${spinning ? 'opacity-40' : 'opacity-100'}`}>
+          {items.map((item, idx) => (
+            <span key={idx} className="text-sm bg-dem-green-100 text-dem-green-700 px-3 py-1.5 rounded-full font-medium">
+              {item}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -1,54 +1,51 @@
 import { AppState, UserProfile, ThreeDayPlan } from '@/types';
 
 const STORAGE_KEY = 'dem-app-state';
+const ENERGY_MODAL_KEY = 'dem-energy-modal-shown';
+const AI_CACHE_KEY = 'dem-ai-cache';
 
-/**
- * Load app state from localStorage
- */
+export interface CachedRecipe {
+  name: string;
+  tagline: string;
+  prepTime: string;
+  ingredients: { item: string; amount: string }[];
+  steps: string[];
+  nutrition: { protein: string; carbs: string; fats: string; calories: string };
+  tip: string;
+}
+
+export interface CachedInsight {
+  trend: 'improving' | 'stable' | 'declining' | 'insufficient_data';
+  insight: string;
+  patientMessage: string;
+  careNote: string;
+  alerts: { severity: string; type: string; message: string; recommendation: string }[];
+}
+
+export interface AICache {
+  recipes: Record<string, CachedRecipe>;
+  insights: Record<string, CachedInsight>;
+}
+
+// App State
 export function loadAppState(): AppState {
-  if (typeof window === 'undefined') {
-    return getDefaultState();
-  }
-
+  if (typeof window === 'undefined') return getDefaultState();
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) {
-      return getDefaultState();
-    }
-    return JSON.parse(stored);
-  } catch (error) {
-    console.error('Error loading app state:', error);
-    return getDefaultState();
-  }
+    return stored ? JSON.parse(stored) : getDefaultState();
+  } catch { return getDefaultState(); }
 }
 
-/**
- * Save app state to localStorage
- */
 export function saveAppState(state: AppState): void {
   if (typeof window === 'undefined') return;
-
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (error) {
-    console.error('Error saving app state:', error);
-  }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch (e) { console.error('Error saving app state:', e); }
 }
 
-/**
- * Default app state
- */
 function getDefaultState(): AppState {
-  return {
-    user: null,
-    currentPlan: null,
-    hasCompletedOnboarding: false,
-  };
+  return { user: null, currentPlan: null, hasCompletedOnboarding: false };
 }
 
-/**
- * Save user profile
- */
 export function saveUserProfile(user: UserProfile): void {
   const state = loadAppState();
   state.user = user;
@@ -56,18 +53,12 @@ export function saveUserProfile(user: UserProfile): void {
   saveAppState(state);
 }
 
-/**
- * Save current plan
- */
 export function saveCurrentPlan(plan: ThreeDayPlan): void {
   const state = loadAppState();
   state.currentPlan = plan;
   saveAppState(state);
 }
 
-/**
- * Update plan (e.g., when completing tasks)
- */
 export function updatePlan(updater: (plan: ThreeDayPlan) => ThreeDayPlan): void {
   const state = loadAppState();
   if (state.currentPlan) {
@@ -76,44 +67,64 @@ export function updatePlan(updater: (plan: ThreeDayPlan) => ThreeDayPlan): void 
   }
 }
 
-/**
- * Save which days have shown the energy modal
- */
+// Energy Modal
 export function saveEnergyModalShown(dayNumber: number): void {
   if (typeof window === 'undefined') return;
-  
   try {
-    const key = 'dem-energy-modal-shown';
-    const stored = localStorage.getItem(key);
+    const stored = localStorage.getItem(ENERGY_MODAL_KEY);
     const shown = stored ? JSON.parse(stored) : {};
     shown[dayNumber] = true;
-    localStorage.setItem(key, JSON.stringify(shown));
-  } catch (error) {
-    console.error('Error saving energy modal state:', error);
-  }
+    localStorage.setItem(ENERGY_MODAL_KEY, JSON.stringify(shown));
+  } catch (e) { console.error(e); }
 }
 
-/**
- * Check if energy modal has been shown for a day
- */
 export function hasShownEnergyModal(dayNumber: number): boolean {
   if (typeof window === 'undefined') return false;
-  
   try {
-    const key = 'dem-energy-modal-shown';
-    const stored = localStorage.getItem(key);
+    const stored = localStorage.getItem(ENERGY_MODAL_KEY);
     const shown = stored ? JSON.parse(stored) : {};
     return !!shown[dayNumber];
-  } catch (error) {
-    return false;
-  }
+  } catch { return false; }
 }
 
-/**
- * Clear all data (reset app)
- */
+// AI Cache
+function loadAICache(): AICache {
+  if (typeof window === 'undefined') return { recipes: {}, insights: {} };
+  try {
+    const stored = localStorage.getItem(AI_CACHE_KEY);
+    return stored ? JSON.parse(stored) : { recipes: {}, insights: {} };
+  } catch { return { recipes: {}, insights: {} }; }
+}
+
+function saveAICache(cache: AICache): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(AI_CACHE_KEY, JSON.stringify(cache)); }
+  catch (e) { console.error('Error saving AI cache:', e); }
+}
+
+export function getCachedRecipe(dayNumber: number, mealType: string): CachedRecipe | null {
+  return loadAICache().recipes[`${dayNumber}-${mealType}`] ?? null;
+}
+
+export function setCachedRecipe(dayNumber: number, mealType: string, recipe: CachedRecipe): void {
+  const cache = loadAICache();
+  cache.recipes[`${dayNumber}-${mealType}`] = recipe;
+  saveAICache(cache);
+}
+
+export function getCachedInsight(dayNumber: number): CachedInsight | null {
+  return loadAICache().insights[`${dayNumber}`] ?? null;
+}
+
+export function setCachedInsight(dayNumber: number, insight: CachedInsight): void {
+  const cache = loadAICache();
+  cache.insights[`${dayNumber}`] = insight;
+  saveAICache(cache);
+}
+
 export function clearAppState(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem('dem-energy-modal-shown');
+  localStorage.removeItem(ENERGY_MODAL_KEY);
+  localStorage.removeItem(AI_CACHE_KEY);
 }
