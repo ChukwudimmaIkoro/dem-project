@@ -2,6 +2,8 @@
 
 # Dem - AI-Powered Patient Adherence Platform
 
+**Deployment Link: https://dem-project.vercel.app/
+
 **Diet · Exercise · Mentality**
 
 A 3-day health planner that adapts to how you actually feel, not how you should feel.
@@ -64,28 +66,6 @@ A bouncing circle character that reacts to your energy:
 | AI | Claude Sonnet 4.5 | Recipe + insight generation |
 | Storage | localStorage | Zero backend MVP |
 | Deployment | Vercel | One-click deploy |
-
----
-
-## Quick Start
-
-```bash
-# Install dependencies
-npm install
-
-# Set up environment
-cp .env.local.example .env.local
-# Add your ANTHROPIC_API_KEY to .env.local
-
-# Run locally
-npm run dev
-
-# Deploy to Vercel
-vercel --prod
-# Add ANTHROPIC_API_KEY in Vercel dashboard → Settings → Environment Variables
-```
-
----
 
 ## How AI Works
 
