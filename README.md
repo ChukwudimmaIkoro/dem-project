@@ -2,7 +2,7 @@
 
 # Dem - AI-Powered Patient Adherence Platform
 
-**Deployment Link: https://dem-project.vercel.app/
+**Deployment Link: https://dem-project.vercel.app/**
 
 **Diet · Exercise · Mentality**
 
