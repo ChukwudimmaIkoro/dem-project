@@ -1,4 +1,4 @@
-## For Talent Tank Hackathon, February 2026
+## 1st Place Talent Tank Hackathon Project, February 16, 2026 
 
 # Dem - AI-Powered Patient Adherence Platform
 
