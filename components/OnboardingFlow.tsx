@@ -78,10 +78,10 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           <div className="flex flex-col items-center">
             <img 
               src="/qr-code.png" 
-              alt="Scan to demo" 
+              alt="Scan to demo (AI features may be rate limited)" 
               className="w-20 h-20 rounded-lg border-2 border-gray-200"
             />
-            <p className="text-xs text-gray-500 mt-1">Scan to demo</p>
+            <p className="text-xs text-gray-500 mt-1">Scan to demo<br></br> (AI features may be rate limited)</p>
           </div>
         </div>
         <h1 className="text-4xl font-bold text-dem-green-600 mb-2">Dem</h1>
