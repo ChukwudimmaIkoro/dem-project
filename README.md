@@ -8,6 +8,8 @@
 
 A 3-day health planner that adapts to how you actually feel, not how you should feel.
 
+![Demo](public/DemDemo.gif).
+
 ---
 
 Dem scales daily tasks to your self-reported energy level:
