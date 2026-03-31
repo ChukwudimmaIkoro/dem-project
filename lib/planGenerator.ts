@@ -8,8 +8,8 @@ import {
   MentalityPlan
 } from '@/types';
 import { getFoodsByIds, FOODS } from './foods';
-import { EXERCISES, getExercisesByIntensity } from './exercises';
-import { getRandomMentalityCheck, getMentalityCheckByType } from './mentality';
+import { EXERCISES, getExercisesByIntensity, getExercisesByIds } from './exercises';
+import { MENTALITY_CHECKS, getRandomMentalityCheck, getMentalityCheckByType } from './mentality';
 
 /**
  * ENERGY SCALING LOGIC
@@ -104,20 +104,30 @@ function generateDietPlan(userFoods: string[], energyLevel: EnergyLevel, dayNumb
 }
 
 /**
- * Generate exercise plan based on energy level
+ * Generate exercise plan based on energy level and user preferences
  */
-function generateExercisePlan(energyLevel: EnergyLevel, dayNumber: number): ExercisePlan {
+function generateExercisePlan(energyLevel: EnergyLevel, dayNumber: number, userExercises: string[]): ExercisePlan {
   const intensity = ENERGY_TO_INTENSITY[energyLevel];
-  const exercises = getExercisesByIntensity(intensity);
-  
-  // Pick 1-2 exercises based on day progression
+
+  // Build pool: user's selected exercises filtered by intensity, falling back as needed
+  let pool;
+  if (userExercises.length === 0) {
+    pool = getExercisesByIntensity(intensity);
+  } else {
+    const userPool = getExercisesByIds(userExercises);
+    pool = userPool.filter(ex => ex.intensity === intensity);
+    if (pool.length === 0) pool = userPool;               // no matching intensity — use all user picks
+    if (pool.length === 0) pool = getExercisesByIntensity(intensity); // final fallback
+  }
+
+  // Pick 1–2 exercises based on day progression (Fisher-Yates)
   const selectedCount = dayNumber === 1 ? 1 : dayNumber === 2 ? 1 : 2;
-  const shuffled = [...exercises];
+  const shuffled = [...pool];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  const selected = shuffled.slice(0, selectedCount);
+  const selected = shuffled.slice(0, Math.min(selectedCount, shuffled.length));
 
   return {
     focus: energyLevel === 'low' ? 'Light movement' :
@@ -126,80 +136,116 @@ function generateExercisePlan(energyLevel: EnergyLevel, dayNumber: number): Exer
     exercises: selected,
     totalDuration: selected.reduce((sum, ex) => {
       const mins = parseInt(ex.duration);
-      return sum + mins;
+      return sum + (isNaN(mins) ? 0 : mins);
     }, 0) + ' min',
   };
 }
 
 /**
- * Generate mentality check
+ * Generate mentality check based on user preferences
  */
-function generateMentalityPlan(dayNumber: number): MentalityPlan {
-  // Day 1: affirmation, Day 2: breathing, Day 3: reflection
-  const types = ['affirmation', 'breathing', 'reflection'] as const;
-  const check = getMentalityCheckByType(types[dayNumber - 1]) || getRandomMentalityCheck();
-  
+function generateMentalityPlan(dayNumber: number, userMentality: string[]): MentalityPlan {
+  if (userMentality.length === 0) {
+    // No preference — rotate through affirmation/breathing/reflection by day
+    const types = ['affirmation', 'breathing', 'reflection'] as const;
+    const check = getMentalityCheckByType(types[(dayNumber - 1) % 3]) || getRandomMentalityCheck();
+    return { check };
+  }
+
+  // Pick from user's selected checks, rotating by day number
+  const userPool = MENTALITY_CHECKS.filter(m => userMentality.includes(m.id));
+  const shuffled = [...userPool];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const check = shuffled[(dayNumber - 1) % shuffled.length] ?? getRandomMentalityCheck();
   return { check };
 }
 
 /**
- * MAIN FUNCTION: Generate complete 3-day plan
+ * MAIN FUNCTION: Generate a plan of any supported length
  */
-export function generateThreeDayPlan(user: UserProfile, energyLevels?: [EnergyLevel, EnergyLevel, EnergyLevel]): ThreeDayPlan {
-  // Default to medium energy if not specified
-  const levels: [EnergyLevel, EnergyLevel, EnergyLevel] = energyLevels || ['medium', 'medium', 'medium'];
-  
-  const now = new Date();
-  
-  const days: [DayPlan, DayPlan, DayPlan] = [
-    {
-      dayNumber: 1,
-      date: new Date(now.getTime() + 0 * 24 * 60 * 60 * 1000).toISOString(),
-      energyLevel: levels[0],
-      diet: generateDietPlan(user.selectedFoods, levels[0], 1),
-      exercise: generateExercisePlan(levels[0], 1),
-      mentality: generateMentalityPlan(1),
-      completed: {
-        diet: false,
-        exercise: false,
-        mentality: false,
-      },
-    },
-    {
-      dayNumber: 2,
-      date: new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000).toISOString(),
-      energyLevel: levels[1],
-      diet: generateDietPlan(user.selectedFoods, levels[1], 2),
-      exercise: generateExercisePlan(levels[1], 2),
-      mentality: generateMentalityPlan(2),
-      completed: {
-        diet: false,
-        exercise: false,
-        mentality: false,
-      },
-    },
-    {
-      dayNumber: 3,
-      date: new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-      energyLevel: levels[2],
-      diet: generateDietPlan(user.selectedFoods, levels[2], 3),
-      exercise: generateExercisePlan(levels[2], 3),
-      mentality: generateMentalityPlan(3),
-      completed: {
-        diet: false,
-        exercise: false,
-        mentality: false,
-      },
-    },
-  ];
+export function generatePlan(
+  user: UserProfile,
+  planLength: 3 | 5 | 7 | 14 | 30 = 3,
+  energyLevels?: EnergyLevel[],
+): ThreeDayPlan {
+  const now    = new Date();
+  const levels = energyLevels ?? [];
+
+  const days: DayPlan[] = Array.from({ length: planLength }, (_, i) => {
+    const dayNumber   = i + 1;
+    const energy: EnergyLevel = levels[i] ?? 'medium';
+    return {
+      dayNumber,
+      date:         new Date(now.getTime() + i * 24 * 60 * 60 * 1000).toISOString(),
+      energyLevel:  energy,
+      energyLocked: false,
+      diet:         generateDietPlan(user.selectedFoods, energy, dayNumber),
+      exercise:     generateExercisePlan(energy, dayNumber, user.selectedExercises ?? []),
+      mentality:    generateMentalityPlan(dayNumber, user.selectedMentality ?? []),
+      completed:    { diet: false, exercise: false, mentality: false },
+    };
+  });
 
   return {
-    id: `plan-${Date.now()}`,
-    createdAt: now.toISOString(),
+    id:               `plan-${Date.now()}`,
+    createdAt:        now.toISOString(),
+    startDate:        now.toISOString(),
+    planLength,
     days,
-    currentDay: 1,
-    streak: 0,
+    currentDay:       1,
+    streak:           0,
+    historicalStreak: 0,
+    dummyCurrency:    0,
   };
+}
+
+/**
+ * Backward-compatible alias for 3-day plan generation
+ */
+export function generateThreeDayPlan(
+  user: UserProfile,
+  energyLevels?: EnergyLevel[],
+): ThreeDayPlan {
+  return generatePlan(user, 3, energyLevels);
+}
+
+/**
+ * Regenerate only the diet + exercise for one day when energy changes.
+ * Preserves all other day state (completed, mentality, energyLocked).
+ */
+export function regenerateDayForEnergy(
+  plan: ThreeDayPlan,
+  dayIdx: number,
+  energy: EnergyLevel,
+  user: UserProfile,
+): ThreeDayPlan {
+  const updated = { ...plan, days: [...plan.days] };
+  const dayNumber = dayIdx + 1;
+  updated.days[dayIdx] = {
+    ...updated.days[dayIdx],
+    energyLevel: energy,
+    diet:        generateDietPlan(user.selectedFoods, energy, dayNumber),
+    exercise:    generateExercisePlan(energy, dayNumber, user.selectedExercises ?? []),
+  };
+  return updated;
+}
+
+/**
+ * Return the 0-based index of the currently active day based on real calendar time.
+ * Compares calendar days (ignores time-of-day). Clamps to [0, days.length - 1].
+ */
+export function getActiveDayIndex(plan: ThreeDayPlan): number {
+  const startStr = plan.startDate ?? plan.createdAt;
+  const start    = new Date(startStr);
+  const today    = new Date();
+  // Strip time component for calendar-day comparison
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const diff     = Math.floor((todayDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.min(Math.max(0, diff), plan.days.length - 1);
 }
 
 /**

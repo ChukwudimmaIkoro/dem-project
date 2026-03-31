@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, TrendingUp, TrendingDown, Minus, AlertTriangle, Sparkles, ChevronDown } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, Minus, AlertTriangle, Sparkles, ChevronDown, Stethoscope, ShieldCheck } from 'lucide-react';
 import { getCachedInsight, setCachedInsight, CachedInsight } from '@/lib/storage';
 
 interface InsightsProps {
@@ -122,21 +122,23 @@ export default function AIHealthInsights({
       <div
         className="rounded-2xl overflow-hidden"
         style={{
-          background: 'linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%)',
-          border:     '1.5px solid #bfdbfe',
+          background: '#ffffff',
+          border:     '1.5px solid #e2e8f0',
+          boxShadow:  '0 1px 4px rgba(0,0,0,0.06)',
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: '#dbeafe' }}>
-              <Activity className="w-4 h-4 text-blue-600" />
+        <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-slate-100">
+                <Activity className="w-4 h-4 text-slate-600" />
+              </div>
+              <div>
+                <h3 className="font-black text-sm text-gray-900">Health Summary</h3>
+                <p className="text-[11px] text-gray-400">For your care provider — generated from your self-reported data</p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-black text-sm text-gray-900">Health Insights</h3>
-              <p className="text-[11px] text-gray-400">AI-powered analysis</p>
-            </div>
-          </div>
 
           <motion.button
             onClick={handleButton}
@@ -180,6 +182,7 @@ export default function AIHealthInsights({
               )}
             </AnimatePresence>
           </motion.button>
+          </div>
         </div>
 
         {/* Body */}
@@ -256,19 +259,20 @@ export default function AIHealthInsights({
                   <p className="text-sm text-green-700 font-semibold leading-relaxed">{insight.patientMessage}</p>
                 </motion.div>
 
-                {/* Care note toggle */}
+                {/* Clinical note toggle */}
                 <motion.button
                   onClick={() => setShowCareNote(v => !v)}
-                  className="flex items-center gap-1 text-xs font-bold text-blue-500 mb-2"
+                  className="flex items-center gap-1.5 text-xs font-bold text-slate-500 mb-2"
                   whileTap={{ scale: 0.95 }}
                 >
+                  <Stethoscope className="w-3.5 h-3.5" />
                   <motion.div
                     animate={{ rotate: showCareNote ? 180 : 0 }}
                     transition={{ type: 'spring', stiffness: 340, damping: 24 }}
                   >
                     <ChevronDown className="w-3.5 h-3.5" />
                   </motion.div>
-                  {showCareNote ? 'Hide' : 'View'} care team note
+                  {showCareNote ? 'Hide' : 'View'} clinical note
                 </motion.button>
 
                 <AnimatePresence>
@@ -280,19 +284,23 @@ export default function AIHealthInsights({
                       transition={{ type: 'spring', stiffness: 280, damping: 26 }}
                       className="overflow-hidden mb-3"
                     >
-                      <div className="rounded-xl p-3" style={{ background: '#dbeafe', border: '1px solid #93c5fd' }}>
-                        <p className="text-xs text-blue-800 leading-relaxed">
-                          <span className="font-black">Clinical Note: </span>
+                      <div className="rounded-xl p-3" style={{ background: '#f8fafc', border: '1px solid #cbd5e1' }}>
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                          <span className="font-black text-slate-700">Clinical Note: </span>
                           {insight.careNote}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
+                          If your doctor or care coordinator recommended a plan like this, share this summary at your next visit.
                         </p>
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                {/* Alerts */}
+                {/* Clinical alerts */}
                 {insight.alerts?.length > 0 && (
                   <div className="space-y-2 mt-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wide">Clinical Flags</p>
                     {insight.alerts.map((alert, i) => (
                       <motion.div
                         key={i}
@@ -301,24 +309,32 @@ export default function AIHealthInsights({
                         transition={{ delay: i * 0.07, type: 'spring', stiffness: 300, damping: 24 }}
                         className="rounded-xl p-3"
                         style={{
-                          background: alert.severity === 'HIGH' ? '#fef2f2' : '#fefce8',
-                          border:     `1.5px solid ${alert.severity === 'HIGH' ? '#fca5a5' : '#fcd34d'}`,
+                          background: alert.severity === 'HIGH' ? '#fff5f5' : '#fffbeb',
+                          border:     `1px solid ${alert.severity === 'HIGH' ? '#fecaca' : '#fde68a'}`,
                         }}
                       >
                         <div className="flex items-start gap-2">
                           <AlertTriangle
-                            className="w-4 h-4 flex-shrink-0 mt-0.5"
-                            style={{ color: alert.severity === 'HIGH' ? '#ef4444' : '#d97706' }}
+                            className="w-3.5 h-3.5 flex-shrink-0 mt-0.5"
+                            style={{ color: alert.severity === 'HIGH' ? '#dc2626' : '#d97706' }}
                           />
                           <div>
-                            <p className="text-xs font-black text-gray-800">{alert.message}</p>
-                            <p className="text-xs text-gray-500 mt-0.5">{alert.recommendation}</p>
+                            <p className="text-xs font-bold text-slate-700">{alert.message}</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">{alert.recommendation}</p>
                           </div>
                         </div>
                       </motion.div>
                     ))}
                   </div>
                 )}
+
+                {/* HIPAA-framed disclaimer */}
+                <div className="flex items-start gap-2 mt-4 pt-3 border-t border-gray-100">
+                  <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-slate-400" />
+                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                    No personally identifiable data is sent to third parties without your consent. This summary is stored on your device only.
+                  </p>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

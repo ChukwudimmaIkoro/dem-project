@@ -9,14 +9,16 @@ import {
 } from '@/lib/storage';
 import {
   isDayComplete, calculateStreak,
-  generateThreeDayPlan, shuffleDietMeals,
+  generatePlan, generateThreeDayPlan, shuffleDietMeals,
+  getActiveDayIndex, regenerateDayForEnergy,
 } from '@/lib/planGenerator';
+import { DEV_MODE } from '@/lib/devMode';
 import { ENERGY_CONFIG } from './Mascot';
 import { Button } from './Button';
 import { Card } from './Card';
 import {
   Check, Flame, RotateCcw, Utensils, Dumbbell, Brain,
-  Sunrise, Sun, Moon, Coffee, Sparkles, type LucideIcon,
+  Sunrise, Sun, Moon, Coffee, Sparkles, Wrench, type LucideIcon,
 } from 'lucide-react';
 import BottomNav from './BottomNav';
 import PillarTabs from './PillarTabs';
@@ -24,7 +26,11 @@ import EnergyModal from './EnergyModal';
 import Mascot from './Mascot';
 import AIRecipeCard from './AIRecipeCard';
 import AIHealthInsights from './AIHealthInsights';
+import AIExerciseCoach from './AIExerciseCoach';
 import FloatingMascot from './FloatingMascot';
+import MascotTutorial from './MascotTutorial';
+import { TUTORIALS } from '@/lib/tutorials';
+import { useTutorial } from '@/hooks/useTutorial';
 
 // ─── Energy theme tokens ────────────────────────────────────────────────────────
 
@@ -100,19 +106,34 @@ export default function PlanView({ onReset }: PlanViewProps) {
   // Energy transition overlay
   const [showEnergyTransition, setShowEnergyTransition] = useState(false);
   const [transitionEnergy,     setTransitionEnergy]     = useState<EnergyLevel>('medium');
+  // Streak extension modal (shown after plan is fully complete)
+  const [showStreakExtension, setShowStreakExtension] = useState(false);
+  // Dev panel
+  const [showDevPanel, setShowDevPanel] = useState(false);
+
+  // Tutorials — one per context
+  const homeTutorial     = useTutorial('home');
+  const dietTutorial     = useTutorial('diet');
+  const exerciseTutorial = useTutorial('exercise');
+  const mentalityTutorial = useTutorial('mentality');
+  const progressTutorial = useTutorial('progress');
 
   useEffect(() => {
     const state = loadAppState();
     if (state.currentPlan) {
       setPlan(state.currentPlan);
+      // In production: jump to the real-time active day. In dev: fall back to first incomplete.
+      const realtimeIdx = getActiveDayIndex(state.currentPlan);
       const firstIncomplete = state.currentPlan.days.findIndex(d => !isDayComplete(d));
-      const dayIdx = firstIncomplete === -1 ? 2 : firstIncomplete;
+      const dayIdx = DEV_MODE
+        ? (firstIncomplete === -1 ? state.currentPlan.days.length - 1 : firstIncomplete)
+        : realtimeIdx;
       setCurrentDayIndex(dayIdx);
       if (state.user?.name)          setUserName(state.user.name);
       if (state.user?.selectedFoods) setUserFoods(state.user.selectedFoods);
 
-      const dayNumber = state.currentPlan.days[dayIdx].dayNumber;
-      if (!hasShownEnergyModal(dayNumber)) {
+      const day = state.currentPlan.days[dayIdx];
+      if (!hasShownEnergyModal(day.dayNumber) && !(day.energyLocked ?? false)) {
         setTimeout(() => setShowEnergyModal(true), 600);
       }
     }
@@ -145,22 +166,16 @@ export default function PlanView({ onReset }: PlanViewProps) {
 
   const handleEnergySelect = (energy: EnergyLevel) => {
     setShowEnergyModal(false);
+    if (currentDay.energyLocked ?? false) return; // locked after day completion
+
     const state = loadAppState();
     if (!state.user || !state.currentPlan) return;
 
-    const newPlan = { ...state.currentPlan };
-    const energyLevels: [EnergyLevel, EnergyLevel, EnergyLevel] = [
-      currentDayIndex === 0 ? energy : newPlan.days[0].energyLevel,
-      currentDayIndex === 1 ? energy : newPlan.days[1].energyLevel,
-      currentDayIndex === 2 ? energy : newPlan.days[2].energyLevel,
-    ];
-    const regenerated = generateThreeDayPlan(state.user, energyLevels);
-    regenerated.days.forEach((day, idx) => { day.completed = newPlan.days[idx].completed; });
+    const regenerated = regenerateDayForEnergy(state.currentPlan, currentDayIndex, energy, state.user);
     saveCurrentPlan(regenerated);
     setPlan(regenerated);
     saveEnergyModalShown(regenerated.days[currentDayIndex].dayNumber);
 
-    // Trigger full-screen zoom overlay
     setTransitionEnergy(energy);
     setShowEnergyTransition(true);
     setTimeout(() => setShowEnergyTransition(false), 1800);
@@ -170,21 +185,46 @@ export default function PlanView({ onReset }: PlanViewProps) {
   };
 
   const toggleTask = (pillar: 'diet' | 'exercise' | 'mentality') => {
+    const wasComplete = isComplete;
     updatePlan(p => {
-      const updated = { ...p };
-      updated.days[currentDayIndex].completed[pillar] =
-        !updated.days[currentDayIndex].completed[pillar];
-      if (isDayComplete(updated.days[currentDayIndex]) && !isComplete) {
-        setShowCelebration(true);
-        setTimeout(() => setShowCelebration(false), 2200);
+      const updated = { ...p, days: [...p.days] };
+      updated.days[currentDayIndex] = {
+        ...updated.days[currentDayIndex],
+        completed: {
+          ...updated.days[currentDayIndex].completed,
+          [pillar]: !updated.days[currentDayIndex].completed[pillar],
+        },
+      };
+      // Lock energy once all 3 pillars are done
+      if (isDayComplete(updated.days[currentDayIndex]) && !wasComplete) {
+        updated.days[currentDayIndex] = { ...updated.days[currentDayIndex], energyLocked: true };
       }
       return updated;
     });
+
     const s = loadAppState();
-    if (s.currentPlan) setPlan(s.currentPlan);
+    if (!s.currentPlan) return;
+    setPlan(s.currentPlan);
+
+    const nowComplete = isDayComplete(s.currentPlan.days[currentDayIndex]);
+    if (nowComplete && !wasComplete) {
+      // Only celebrate if day 1, or if previous day was also completed (building a streak)
+      const prevDone = currentDayIndex === 0 || isDayComplete(s.currentPlan.days[currentDayIndex - 1]);
+      if (prevDone) {
+        setShowCelebration(true);
+        setTimeout(() => {
+          setShowCelebration(false);
+          // If every day in the plan is done, open streak extension modal
+          const allDone = s.currentPlan!.days.every(d => isDayComplete(d));
+          if (allDone) setTimeout(() => setShowStreakExtension(true), 400);
+        }, 2200);
+      }
+    }
   };
 
   const handleDayChange = (dayIdx: number) => {
+    // In production, block navigation to days that haven't started yet
+    if (!DEV_MODE && dayIdx > getActiveDayIndex(plan)) return;
     if (dayIdx > currentDayIndex && !isDayComplete(plan.days[currentDayIndex])) {
       setPendingDayIdx(dayIdx);
       setShowDayWarning(true);
@@ -208,6 +248,51 @@ export default function PlanView({ onReset }: PlanViewProps) {
       clearAppState();
       onReset();
     }
+  };
+
+  const handleStreakExtension = (newLength: 3 | 5 | 7 | 14 | 30) => {
+    const state = loadAppState();
+    if (!state.user || !state.currentPlan) return;
+    const newPlan = generatePlan(state.user, newLength);
+    newPlan.historicalStreak = (state.currentPlan.historicalStreak ?? 0) + 1;
+    newPlan.dummyCurrency    = (state.currentPlan.dummyCurrency ?? 0) + (state.currentPlan.planLength ?? 3) * 10;
+    saveCurrentPlan(newPlan);
+    setPlan(newPlan);
+    setCurrentDayIndex(0);
+    setShowStreakExtension(false);
+  };
+
+  // Dev-only quick actions
+  const handleDevAction = (action: 'next' | 'complete' | 'reset') => {
+    if (action === 'next') {
+      const next = Math.min(currentDayIndex + 1, plan.days.length - 1);
+      setCurrentDayIndex(next);
+    } else if (action === 'complete') {
+      updatePlan(p => {
+        const updated = { ...p, days: [...p.days] };
+        updated.days[currentDayIndex] = {
+          ...updated.days[currentDayIndex],
+          completed: { diet: true, exercise: true, mentality: true },
+          energyLocked: true,
+        };
+        return updated;
+      });
+      const s = loadAppState();
+      if (s.currentPlan) setPlan(s.currentPlan);
+    } else if (action === 'reset') {
+      updatePlan(p => {
+        const updated = { ...p, days: [...p.days] };
+        updated.days[currentDayIndex] = {
+          ...updated.days[currentDayIndex],
+          completed: { diet: false, exercise: false, mentality: false },
+          energyLocked: false,
+        };
+        return updated;
+      });
+      const s = loadAppState();
+      if (s.currentPlan) setPlan(s.currentPlan);
+    }
+    setShowDevPanel(false);
   };
 
   // ── Account tab ──────────────────────────────────────────────────────────
@@ -319,6 +404,11 @@ export default function PlanView({ onReset }: PlanViewProps) {
             firstVisitMessage={`Hey ${userName || 'friend'}! This is your Progress tab — track your streak and get your AI health summary here.`}
           />
           <BottomNav activeTab={activeBottomTab} onTabChange={setActiveBottomTab} accentColor={theme.accent} />
+          <AnimatePresence>
+            {progressTutorial.shouldShow && (
+              <MascotTutorial slides={TUTORIALS.progress} onDismiss={progressTutorial.dismiss} />
+            )}
+          </AnimatePresence>
         </div>
       </EnergyBackground>
     );
@@ -433,7 +523,7 @@ export default function PlanView({ onReset }: PlanViewProps) {
             >
               Dem
             </motion.h1>
-            <p className="text-sm text-gray-500 font-semibold">Day {currentDay.dayNumber} of 3</p>
+            <p className="text-sm text-gray-500 font-semibold">Day {currentDay.dayNumber} of {plan.planLength ?? 3}</p>
           </div>
 
           {/* Streak badge */}
@@ -451,28 +541,35 @@ export default function PlanView({ onReset }: PlanViewProps) {
         {/* Day navigator */}
         <div className="flex gap-2.5 mb-5">
           {plan.days.map((day, idx) => {
-            const done      = isDayComplete(day);
-            const isCurrent = idx === currentDayIndex;
-            const dotColor  = ENERGY_CONFIG[day.energyLevel].color;
+            const done        = isDayComplete(day);
+            const isCurrent   = idx === currentDayIndex;
+            const activeDayIdx = getActiveDayIndex(plan);
+            const isFuture    = !DEV_MODE && idx > activeDayIdx;
+            const dotColor    = ENERGY_CONFIG[day.energyLevel].color;
             return (
               <motion.button
                 key={idx}
                 onClick={() => handleDayChange(idx)}
+                disabled={isFuture}
                 className="flex-1 relative rounded-2xl py-3 flex flex-col items-center gap-1"
                 style={{
-                  background: isCurrent ? theme.accent : done ? `${theme.accent}22` : '#f3f4f6',
-                  boxShadow:  isCurrent
+                  background: isCurrent ? theme.accent
+                    : done    ? `${theme.accent}22`
+                    : isFuture ? '#f3f4f6'
+                    : '#f3f4f6',
+                  boxShadow: isCurrent
                     ? `0 4px 0 0 ${theme.accentDark}66, 0 2px 8px ${theme.accent}33`
                     : `0 2px 0 0 #d1d5db`,
+                  opacity: isFuture ? 0.4 : 1,
                 }}
-                whileTap={{ scale: 0.95, y: 2 }}
+                whileTap={isFuture ? {} : { scale: 0.95, y: 2 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 28 }}
               >
                 <span
                   className="text-xl font-black"
                   style={{ color: isCurrent ? 'white' : done ? theme.accentDark : '#6b7280' }}
                 >
-                  {done ? '✓' : idx + 1}
+                  {done ? '✓' : isFuture ? '🔒' : idx + 1}
                 </span>
                 <span
                   className="text-[10px] font-bold"
@@ -480,11 +577,13 @@ export default function PlanView({ onReset }: PlanViewProps) {
                 >
                   Day {idx + 1}
                 </span>
-                {/* Energy dot */}
-                <div
-                  className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white"
-                  style={{ background: dotColor }}
-                />
+                {/* Energy dot — hidden for future days */}
+                {!isFuture && (
+                  <div
+                    className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white"
+                    style={{ background: dotColor }}
+                  />
+                )}
               </motion.button>
             );
           })}
@@ -512,10 +611,10 @@ export default function PlanView({ onReset }: PlanViewProps) {
         {/* Mascot — clickable to open energy modal */}
         <motion.div
           className="flex justify-center mb-4 cursor-pointer"
-          onClick={() => setShowEnergyModal(true)}
+          onClick={() => { if (!(currentDay.energyLocked ?? false)) setShowEnergyModal(true); }}
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
-          title="Tap to change energy level"
+          title={(currentDay.energyLocked ?? false) ? 'Day complete — energy locked' : 'Tap to change energy level'}
         >
           <Mascot
             key={activePillar}
@@ -596,12 +695,123 @@ export default function PlanView({ onReset }: PlanViewProps) {
               exit={{ scale: 1.1, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
             >
-              <div className="text-7xl mb-3">🎉</div>
-              <p className="text-3xl font-black text-white">Day Complete!</p>
+              {streak > 1 ? (
+                <>
+                  <div className="text-7xl mb-3">🔥</div>
+                  <p className="text-3xl font-black text-white">{streak}-Day Streak!</p>
+                  <p className="text-white opacity-80 mt-1">Keep it going!</p>
+                </>
+              ) : (
+                <>
+                  <div className="text-7xl mb-3">🎉</div>
+                  <p className="text-3xl font-black text-white">Day 1 Done!</p>
+                  <p className="text-white opacity-80 mt-1">You started — that's everything.</p>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Streak extension modal — shown after all days are complete */}
+      <AnimatePresence>
+        {showStreakExtension && (
+          <motion.div
+            className="fixed inset-0 z-[150] flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.6)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl"
+              initial={{ scale: 0.85, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 26 }}
+            >
+              <div className="text-center mb-5">
+                <div className="text-5xl mb-3">🏆</div>
+                <h3 className="text-xl font-black text-gray-900">
+                  You finished your {plan.planLength ?? 3}-day streak!
+                </h3>
+                <p className="text-gray-500 text-sm mt-1">
+                  Ready to level up? Pick your next streak length.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {([5, 7, 14, 30] as const).map(days => (
+                  <Button
+                    key={days}
+                    onClick={() => handleStreakExtension(days)}
+                    energyColor={theme.accent}
+                    className="text-base font-black"
+                  >
+                    {days} Days
+                  </Button>
+                ))}
+              </div>
+              <Button variant="secondary" onClick={() => handleStreakExtension(3)} className="w-full">
+                Stay at 3 days
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Dev mode panel — only visible in development */}
+      {DEV_MODE && (
+        <>
+          <motion.button
+            className="fixed bottom-24 right-4 z-[120] w-11 h-11 rounded-2xl flex items-center justify-center shadow-lg"
+            style={{ background: '#1f2937' }}
+            onClick={() => setShowDevPanel(v => !v)}
+            whileTap={{ scale: 0.9 }}
+          >
+            <Wrench className="w-5 h-5 text-yellow-400" />
+          </motion.button>
+          <AnimatePresence>
+            {showDevPanel && (
+              <motion.div
+                className="fixed bottom-40 right-4 z-[120] bg-gray-900 rounded-2xl p-3 shadow-2xl w-44 space-y-2"
+                initial={{ opacity: 0, scale: 0.85, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.85, y: 8 }}
+              >
+                <p className="text-yellow-400 text-xs font-black mb-1">DEV TOOLS</p>
+                <button onClick={() => handleDevAction('next')}
+                  className="w-full text-left text-white text-xs py-1.5 px-2 rounded-lg hover:bg-gray-700">
+                  → Next Day
+                </button>
+                <button onClick={() => handleDevAction('complete')}
+                  className="w-full text-left text-white text-xs py-1.5 px-2 rounded-lg hover:bg-gray-700">
+                  ✓ Fast-complete Day
+                </button>
+                <button onClick={() => handleDevAction('reset')}
+                  className="w-full text-left text-white text-xs py-1.5 px-2 rounded-lg hover:bg-gray-700">
+                  ↺ Reset Day Tasks
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
+
+      {/* Mascot tutorials — shown once per context */}
+      <AnimatePresence>
+        {homeTutorial.shouldShow && (
+          <MascotTutorial slides={TUTORIALS.home} onDismiss={homeTutorial.dismiss} />
+        )}
+        {!homeTutorial.shouldShow && activePillar === 'diet' && dietTutorial.shouldShow && (
+          <MascotTutorial slides={TUTORIALS.diet} onDismiss={dietTutorial.dismiss} />
+        )}
+        {!homeTutorial.shouldShow && activePillar === 'exercise' && exerciseTutorial.shouldShow && (
+          <MascotTutorial slides={TUTORIALS.exercise} onDismiss={exerciseTutorial.dismiss} />
+        )}
+        {!homeTutorial.shouldShow && activePillar === 'mentality' && mentalityTutorial.shouldShow && (
+          <MascotTutorial slides={TUTORIALS.mentality} onDismiss={mentalityTutorial.dismiss} />
+        )}
+      </AnimatePresence>
+
     </EnergyBackground>
   );
 }
@@ -779,6 +989,13 @@ function ExerciseView({ day, isCompleted, onToggle }: {
               </span>
             </div>
             <p className="text-sm text-gray-600 leading-relaxed">{ex.description}</p>
+            <AIExerciseCoach
+              exerciseId={ex.id}
+              exerciseName={ex.name}
+              description={ex.description}
+              intensity={ex.intensity}
+              energyLevel={day.energyLevel}
+            />
           </div>
         ))}
       </div>
