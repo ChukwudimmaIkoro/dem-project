@@ -23,6 +23,7 @@ export interface CachedInsight {
 }
 
 export interface AICache {
+  planId: string;
   recipes: Record<string, CachedRecipe>;
   insights: Record<string, CachedInsight>;
 }
@@ -88,12 +89,25 @@ export function hasShownEnergyModal(dayNumber: number): boolean {
 }
 
 // AI Cache
+function getEmptyCache(): AICache {
+  const state = loadAppState();
+  return { planId: state.currentPlan?.id ?? '', recipes: {}, insights: {} };
+}
+
 function loadAICache(): AICache {
-  if (typeof window === 'undefined') return { recipes: {}, insights: {} };
+  if (typeof window === 'undefined') return getEmptyCache();
   try {
     const stored = localStorage.getItem(AI_CACHE_KEY);
-    return stored ? JSON.parse(stored) : { recipes: {}, insights: {} };
-  } catch { return { recipes: {}, insights: {} }; }
+    if (!stored) return getEmptyCache();
+    const cache: AICache = JSON.parse(stored);
+    // Invalidate cache if it belongs to a different plan
+    const currentPlanId = loadAppState().currentPlan?.id ?? '';
+    if (cache.planId !== currentPlanId) {
+      localStorage.removeItem(AI_CACHE_KEY);
+      return getEmptyCache();
+    }
+    return cache;
+  } catch { return getEmptyCache(); }
 }
 
 function saveAICache(cache: AICache): void {

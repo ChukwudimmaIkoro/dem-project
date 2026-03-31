@@ -110,8 +110,8 @@ export default function FoodPieChart({ selectedFoodIds, className = '' }: FoodPi
         {categories.map(({ key, color, emoji }) => {
           const pct = percentages[key];
           const target = targets[key];
-          const isGood = pct >= target.min - 5 && pct <= target.max + 5; // 5% margin on each side
-          const isTooLow = pct > 0 && pct < target.min - 5;
+          const isGood = pct >= target.min - 10 && pct <= target.max + 10; // 10% margin on each side
+          const isTooLow = pct > 0 && pct < target.min - 10;
           
           return pct > 0 ? (
             <div key={key} className="flex items-center justify-between text-xs">
@@ -146,14 +146,14 @@ export default function FoodPieChart({ selectedFoodIds, className = '' }: FoodPi
           const missingCategories = categories.filter(({ key }) => {
             const pct = percentages[key];
             const target = targets[key];
-            return pct === 0 || pct < target.min - 5;
+            return pct === 0 || pct < target.min - 10;
           });
-          
+
           // Check if ALL categories are perfectly balanced
           const allPerfect = categories.every(({ key }) => {
             const pct = percentages[key];
             const target = targets[key];
-            return pct === 0 || (pct >= target.min - 5 && pct <= target.max + 5);
+            return pct === 0 || (pct >= target.min - 10 && pct <= target.max + 10);
           }) && total >= 15;
           
           if (allPerfect) {

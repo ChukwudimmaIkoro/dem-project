@@ -38,7 +38,8 @@ export interface MentalityCheck {
 
 export interface UserProfile {
   name: string;
-  selectedFoods: string[]; //retursn food IDs
+  selectedFoods: string[]; // food IDs; empty array = no preference (use all foods)
+  noFoodPreference?: boolean; // true = skip food selection, rotate from full database
   createdAt: string;
 }
 

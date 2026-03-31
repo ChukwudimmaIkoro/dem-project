@@ -1,9 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { callClaude } from '@/lib/ai';
 import { NextRequest } from 'next/server';
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,8 +42,7 @@ Create a recipe in this EXACT JSON format, no other text:
 
 Use 4-7 ingredients max. Keep steps clear and brief. Make it genuinely delicious.`;
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+    const message = await callClaude({
       max_tokens: 500,
       messages: [{ role: 'user', content: prompt }],
     });
