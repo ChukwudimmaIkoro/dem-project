@@ -34,7 +34,8 @@ const ENERGY_TO_MEAL_STYLE = {
  * Generate diet plan based on user's food preferences and energy level
  */
 function generateDietPlan(userFoods: string[], energyLevel: EnergyLevel, dayNumber: number): DietPlan {
-  const selectedFoods = getFoodsByIds(userFoods);
+  // Empty selectedFoods = "no preference" mode — use the full food database
+  const selectedFoods = userFoods.length > 0 ? getFoodsByIds(userFoods) : FOODS;
   
   // Categorize user's selected foods by meal timing
   const breakfastFoods = selectedFoods.filter(f => 
@@ -47,11 +48,16 @@ function generateDietPlan(userFoods: string[], energyLevel: EnergyLevel, dayNumb
     !f.mealTiming || f.mealTiming.includes('snack')
   );
 
-  // Helper to pick random items
-  const pickRandom = <T,>(arr: T[], count: number): T[] => {
-    const shuffled = [...arr].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
+  // Fisher-Yates shuffle — unbiased random selection
+  const shuffle = <T,>(arr: T[]): T[] => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
   };
+  const pickRandom = <T,>(arr: T[], count: number): T[] => shuffle(arr).slice(0, count);
 
   // Energy-based meal planning
   let mealComplexity = ENERGY_TO_MEAL_STYLE[energyLevel];
@@ -106,9 +112,12 @@ function generateExercisePlan(energyLevel: EnergyLevel, dayNumber: number): Exer
   
   // Pick 1-2 exercises based on day progression
   const selectedCount = dayNumber === 1 ? 1 : dayNumber === 2 ? 1 : 2;
-  const selected = exercises
-    .sort(() => 0.5 - Math.random())
-    .slice(0, selectedCount);
+  const shuffled = [...exercises];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const selected = shuffled.slice(0, selectedCount);
 
   return {
     focus: energyLevel === 'low' ? 'Light movement' :
