@@ -13,21 +13,27 @@ export interface Food {
 
 export type ExerciseIntensity = 'light' | 'moderate' | 'intense';
 export type ExerciseType = 'cardio' | 'strength' | 'flexibility' | 'rest';
+export type MuscleGroup = 'lower' | 'upper' | 'core' | 'full' | 'cardio';
 
 export interface Exercise {
   id: string;
   name: string;
   type: ExerciseType;
   intensity: ExerciseIntensity;
+  muscleGroup: MuscleGroup;
+  emoji: string;
   description: string;
-  duration: string; //ex "20 min", "3 sets"
+  duration: string; // e.g. "20 min", "3 sets"
 }
 
 export type MentalityType = 'affirmation' | 'breathing' | 'reflection' | 'gratitude' | 'meditation';
+export type MentalityPillar = 'mindfulness' | 'physical' | 'emotional' | 'sensory';
 
 export interface MentalityCheck {
   id: string;
   type: MentalityType;
+  pillar: MentalityPillar;
+  emoji: string;
   title: string;
   content: string;
   duration: string;
@@ -38,8 +44,13 @@ export interface MentalityCheck {
 
 export interface UserProfile {
   name: string;
-  selectedFoods: string[]; // food IDs; empty array = no preference (use all foods)
-  noFoodPreference?: boolean; // true = skip food selection, rotate from full database
+  goals: string[];                 // goal IDs selected during onboarding
+  selectedFoods: string[];         // food IDs; empty array = no preference (use all foods)
+  selectedExercises: string[];     // exercise IDs; empty array = no preference
+  selectedMentality: string[];     // mentality check IDs; empty array = no preference
+  noFoodPreference?: boolean;      // true = skip food selection, rotate from full database
+  noExercisePreference?: boolean;  // true = skip exercise selection
+  noMentalityPreference?: boolean; // true = skip mentality selection
   createdAt: string;
 }
 
@@ -71,11 +82,11 @@ export interface MentalityPlan {
   check: MentalityCheck;
 }
 
-//TODO: Later, update for 5 day plan, 1-2 week plans, etc.
 export interface DayPlan {
-  dayNumber: 1 | 2 | 3;
+  dayNumber: number;
   date: string;
   energyLevel: EnergyLevel;
+  energyLocked: boolean;   // true once all 3 pillars are completed — energy can't be changed
   diet: DietPlan;
   exercise: ExercisePlan;
   mentality: MentalityPlan;
@@ -89,9 +100,13 @@ export interface DayPlan {
 export interface ThreeDayPlan {
   id: string;
   createdAt: string;
-  days: [DayPlan, DayPlan, DayPlan];
-  currentDay: 1 | 2 | 3;
+  startDate: string;                      // when the streak clock started (used for real-time day calc)
+  planLength: 3 | 5 | 7 | 14 | 30;       // number of days in this streak
+  days: DayPlan[];
+  currentDay: number;
   streak: number;
+  historicalStreak: number;               // total completed streaks across all plans
+  dummyCurrency: number;                  // placeholder for future monetization
 }
 
 // App State:
