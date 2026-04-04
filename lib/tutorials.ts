@@ -5,7 +5,7 @@ export interface TutorialSlide {
 export const TUTORIALS: Record<string, TutorialSlide[]> = {
   home: [
     { message: "Hi! I'm Dem. I adapt your plan to how you feel each day." },
-    { message: "Tap me anytime to change your energy level — your plan adjusts instantly!" },
+    { message: "Tap me anytime to change your energy level. Your plan adjusts instantly!" },
   ],
   diet: [
     { message: "Here's your meal plan for today! Tap the dice to shuffle any meal." },
@@ -17,7 +17,7 @@ export const TUTORIALS: Record<string, TutorialSlide[]> = {
   ],
   mentality: [
     { message: "Mental health is as important as physical. Take your time with this one." },
-    { message: "Check this off when you're done — all three pillars together build your streak." },
+    { message: "Check this off when you're done. All three pillars together build your streak." },
   ],
   progress: [
     { message: "Track your streak and get an AI health insight summary here." },

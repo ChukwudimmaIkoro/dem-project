@@ -59,14 +59,14 @@ export default function FoodPieChart({ selectedFoodIds, className = '' }: FoodPi
   ];
 
   return (
-    <div className={`bg-white rounded-2xl p-4 shadow-md ${className}`}>
-      <h3 className="text-sm font-bold text-gray-700 mb-3 text-center">
-        Your Food Balance
+    <div className={`bg-white rounded-xl p-2.5 shadow-sm ${className}`}>
+      <h3 className="text-[11px] font-bold text-gray-500 mb-1.5 text-center">
+        Food Balance
       </h3>
-      
+
       {/* Pie chart visualization */}
-      <div className="flex items-center justify-center mb-4">
-        <div className="relative w-32 h-32">
+      <div className="flex items-center justify-center mb-2">
+        <div className="relative w-16 h-16">
           <svg viewBox="0 0 100 100" className="transform -rotate-90">
             {(() => {
               let currentAngle = 0;
@@ -106,78 +106,28 @@ export default function FoodPieChart({ selectedFoodIds, className = '' }: FoodPi
       </div>
 
       {/* Legend */}
-      <div className="space-y-2">
+      <div className="space-y-1">
         {categories.map(({ key, color, emoji }) => {
           const pct = percentages[key];
           const target = targets[key];
-          const isGood = pct >= target.min - 10 && pct <= target.max + 10; // 10% margin on each side
-          const isTooLow = pct > 0 && pct < target.min - 10;
-          
+          const isGood = pct >= target.min - 10 && pct <= target.max + 10;
+
           return pct > 0 ? (
-            <div key={key} className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 flex-1">
-                <div className={`w-3 h-3 rounded-full ${color}`} />
-                <span>{emoji}</span>
-                <span className="text-gray-600">{target.label}</span>
-                {total >= 10 && isTooLow && (
-                  <span className="text-dem-orange-500 text-xs ml-1">
-                    ⚠️ Add more!
-                  </span>
-                )}
+            <div key={key} className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${color}`} />
+                <span className="text-[10px] text-gray-500">{emoji} {target.label}</span>
               </div>
-              <div className="flex items-center gap-1">
-                <span className={`font-semibold ${isGood ? 'text-dem-green-600' : 'text-gray-600'}`}>
-                  {pct.toFixed(0)}%
-                </span>
-                {isGood && <span className="text-dem-green-600">✓</span>}
-              </div>
+              <span className={`text-[10px] font-bold ${isGood ? 'text-dem-green-600' : 'text-gray-500'}`}>
+                {pct.toFixed(0)}%{isGood ? ' ✓' : ''}
+              </span>
             </div>
           ) : null;
         })}
       </div>
 
-      <div className="mt-3 pt-3 border-t border-gray-200">
-        <p className="text-xs text-gray-500 text-center mb-2">
-          {selectedFoodIds.length} foods selected
-        </p>
-        
-        {/* Helpful feedback when 10+ foods selected */}
-        {total >= 10 && (() => {
-          const missingCategories = categories.filter(({ key }) => {
-            const pct = percentages[key];
-            const target = targets[key];
-            return pct === 0 || pct < target.min - 10;
-          });
-
-          // Check if ALL categories are perfectly balanced
-          const allPerfect = categories.every(({ key }) => {
-            const pct = percentages[key];
-            const target = targets[key];
-            return pct === 0 || (pct >= target.min - 10 && pct <= target.max + 10);
-          }) && total >= 15;
-          
-          if (allPerfect) {
-            return (
-              <div className="bg-dem-green-50 border border-dem-green-200 rounded-xl p-2 mt-2">
-                <p className="text-xs text-dem-green-700 text-center font-medium">
-                  ✨ Perfectly balanced, as all meal plans should be! ✨
-                </p>
-              </div>
-            );
-          }
-          
-          if (missingCategories.length > 0) {
-            return (
-              <div className="bg-dem-yellow-50 border border-dem-yellow-200 rounded-xl p-2 mt-2">
-                <p className="text-xs text-dem-yellow-800 text-center font-medium">
-                  💡 Try adding more {missingCategories.map(c => targets[c.key].label.toLowerCase()).join(', ')} for better balance!
-                </p>
-              </div>
-            );
-          }
-          
-          return null;
-        })()}
+      <div className="mt-2 pt-2 border-t border-gray-100">
+        <p className="text-[10px] text-gray-400 text-center">{selectedFoodIds.length} foods selected</p>
       </div>
     </div>
   );

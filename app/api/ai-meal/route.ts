@@ -11,39 +11,41 @@ export async function POST(req: NextRequest) {
       ? 'Moderate prep, 15-20 minutes. Simple cooking allowed.'
       : 'Can be more involved, 20-30 minutes. Optimize for nutrition and macros.';
 
-    const prompt = `You are a nutritionist creating a personalized ${mealType} recipe.
+    const prompt = `You are a culinary expert and nutritionist. Your task is to create a high-quality ${mealType} recipe.
+
+Before generating, mentally draw from popular recipe platforms like AllRecipes, Food Network, Bon Appétit, NYT Cooking, and Serious Eats. Think about what well-tested, highly-rated recipes using these ingredients look like on those sites — their authentic techniques, realistic quantities, and step clarity — then produce a recipe of equivalent quality and reliability.
 
 Available ingredients (use as many as fit naturally): ${foods.join(', ')}
 
-Energy level: ${energyLevel} - ${complexityGuide}
+Energy level: ${energyLevel} — ${complexityGuide}
 
-Create a recipe in this EXACT JSON format, no other text:
+Produce ONLY this JSON, no other text:
 {
-  "name": "Recipe name (creative, appetizing)",
-  "tagline": "One sentence description",
+  "name": "Recipe name (creative, appetizing — like a real cookbook title)",
+  "tagline": "One evocative sentence describing the dish",
   "prepTime": "X minutes",
   "ingredients": [
-    {"item": "ingredient name", "amount": "quantity"},
-    {"item": "ingredient name", "amount": "quantity"}
+    {"item": "ingredient name", "amount": "realistic quantity with units"},
+    {"item": "ingredient name", "amount": "realistic quantity with units"}
   ],
   "steps": [
-    "Step 1 instruction",
-    "Step 2 instruction",
-    "Step 3 instruction"
+    "Clear, specific step as you'd find on AllRecipes",
+    "Next step",
+    "Final step"
   ],
   "nutrition": {
     "protein": "Xg",
-    "carbs": "Xg", 
+    "carbs": "Xg",
     "fats": "Xg",
     "calories": "~XXX"
   },
-  "tip": "One quick pro tip"
+  "tip": "A pro technique tip from a professional kitchen"
 }
 
-Use 4-7 ingredients max. Keep steps clear and brief. Make it genuinely delicious.`;
+Use 4-7 ingredients. Quantities must be realistic (e.g. '2 cups', '1 tbsp', '3 oz'). Steps must be actionable and specific. Make it genuinely delicious and practical to cook at home.`;
 
     const message = await callClaude({
-      max_tokens: 500,
+      max_tokens: 600,
       messages: [{ role: 'user', content: prompt }],
     });
 

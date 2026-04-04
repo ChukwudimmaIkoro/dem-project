@@ -311,7 +311,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 What brings you to <span className="text-dem-green-500">Dem</span>?
               </h1>
               <p className="text-gray-500 text-sm mb-4 leading-relaxed">
-                Select all that apply — we'll tailor your plan around what matters most.
+                Select all that apply. We'll tailor your plan around what matters most.
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {GOAL_OPTIONS.map(goal => {
@@ -357,7 +357,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
               <Button variant="secondary" onClick={() => setStep(1)} className="flex-none px-5">←</Button>
               <Button onClick={() => setStep(3)} className="flex-1 text-lg">
                 {selectedGoals.length > 0
-                  ? `${selectedGoals.length} goal${selectedGoals.length > 1 ? 's' : ''} set — Next →`
+                  ? `${selectedGoals.length} goal${selectedGoals.length > 1 ? 's' : ''} set, Next →`
                   : 'Next →'}
               </Button>
             </div>
@@ -372,7 +372,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 active={noFoodPref}
                 onToggle={() => setNoFoodPref(v => !v)}
                 label="No preference (skip selection)"
-                activeLabel="No preference — surprise me!"
+                activeLabel="No preference, surprise me!"
               />
               <AnimatePresence>
                 {!noFoodPref && (
@@ -387,7 +387,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                     <div className="flex items-center justify-between mt-2">
                       <div>
                         <h2 className="text-xl font-black text-gray-900">Pick Your Foods</h2>
-                        <p className="text-xs text-gray-500">Select at least 10 — we'll build your meals from these.</p>
+                        <p className="text-xs text-gray-500">Select at least 10. We'll build your meals from these.</p>
                       </div>
                       <motion.div
                         className="px-3 py-1.5 rounded-full text-sm font-black"
@@ -443,7 +443,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
             <FloatingMascot
               energy="high"
               userName={name.trim() || undefined}
-              firstVisitMessage={`${name.trim() ? `Hey ${name.trim()}! ` : 'Hey! '}Pick at least 10 foods you like — or tap "No preference" to skip!`}
+              firstVisitMessage={`${name.trim() ? `Hey ${name.trim()}! ` : 'Hey! '}Pick at least 10 foods you like, or tap "No preference" to skip!`}
             />
           </motion.div>
         )}
@@ -456,7 +456,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 active={noExercisePref}
                 onToggle={() => setNoExercisePref(v => !v)}
                 label="No preference (use all exercises)"
-                activeLabel="No preference — mix it up!"
+                activeLabel="No preference, mix it up!"
               />
               <AnimatePresence>
                 {!noExercisePref && (
@@ -470,7 +470,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                     <div className="flex items-center justify-between">
                       <div>
                         <h2 className="text-xl font-black text-gray-900">Pick Your Exercises</h2>
-                        <p className="text-xs text-gray-500">Select at least 5 — your daily workouts pull from these.</p>
+                        <p className="text-xs text-gray-500">Select at least 5. Your daily workouts pull from these.</p>
                       </div>
                       <motion.div
                         className="px-3 py-1.5 rounded-full text-sm font-black"
@@ -506,6 +506,12 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 {hasEnoughExercises ? 'Next →' : `Select ${Math.max(0, 5 - selectedExercises.length)} more`}
               </Button>
             </div>
+
+            <FloatingMascot
+              energy="high"
+              userName={name.trim() || undefined}
+              firstVisitMessage={`${name.trim() ? `Nice, ${name.trim()}! ` : 'Nice! '}Pick at least 5 exercises you enjoy. Your workouts will pull from these.`}
+            />
           </motion.div>
         )}
 
@@ -517,7 +523,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 active={noMentalityPref}
                 onToggle={() => setNoMentalityPref(v => !v)}
                 label="No preference (use all check-ins)"
-                activeLabel="No preference — surprise me!"
+                activeLabel="No preference, surprise me!"
               />
               <AnimatePresence>
                 {!noMentalityPref && (
@@ -531,7 +537,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                     <div className="flex items-center justify-between">
                       <div>
                         <h2 className="text-xl font-black text-gray-900">Your Mind Check-ins</h2>
-                        <p className="text-xs text-gray-500">Select at least 3 — mental health is the third pillar.</p>
+                        <p className="text-xs text-gray-500">Select at least 3. Mental health is the third pillar.</p>
                       </div>
                       <motion.div
                         className="px-3 py-1.5 rounded-full text-sm font-black"
@@ -571,7 +577,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
             <FloatingMascot
               energy="high"
               userName={name.trim() || undefined}
-              firstVisitMessage="Almost there! Pick at least 3 mental check-ins — these keep your mind as healthy as your body."
+              firstVisitMessage="Almost there! Pick at least 3 mental check-ins. They keep your mind as healthy as your body."
             />
           </motion.div>
         )}

@@ -17,7 +17,7 @@ const DEFAULT_IDLE: (name: string) => string[] = (n) => [
   `${n}, small steps still move forward.`,
   'Tap me anytime for a boost!',
   'Every day you show up is a win.',
-  "You've got this — for real.",
+  "You've got this, for real!",
   `Proud of you, ${n}!`,
   'Keep going. It adds up.',
 ];

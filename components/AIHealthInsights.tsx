@@ -91,7 +91,7 @@ export default function AIHealthInsights({
               style={{ background: '#fefce8', border: '2px solid #fcd34d' }}
             >
               <p className="text-sm font-semibold text-amber-800 mb-3">
-                You haven't completed all tasks today — the summary may be partial. Continue anyway?
+                You haven't completed all tasks today. The summary may be partial. Continue anyway?
               </p>
               <div className="flex gap-2">
                 <motion.button
@@ -136,7 +136,7 @@ export default function AIHealthInsights({
               </div>
               <div>
                 <h3 className="font-black text-sm text-gray-900">Health Summary</h3>
-                <p className="text-[11px] text-gray-400">For your care provider — generated from your self-reported data</p>
+                <p className="text-[11px] text-gray-400">For your care provider, generated from your self-reported data</p>
               </div>
             </div>
 

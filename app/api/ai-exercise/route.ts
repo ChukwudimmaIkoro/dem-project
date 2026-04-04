@@ -16,7 +16,7 @@ Respond in this EXACT JSON format, no other text:
 {
   "cue": "One energizing coaching cue (max 12 words)",
   "steps": [
-    "Step 1 — how to do this exercise",
+    "Step 1: how to do this exercise",
     "Step 2",
     "Step 3"
   ],
