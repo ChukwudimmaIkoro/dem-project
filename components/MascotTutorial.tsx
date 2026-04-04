@@ -13,6 +13,9 @@ interface MascotTutorialProps {
 export default function MascotTutorial({ slides, onDismiss }: MascotTutorialProps) {
   const [index, setIndex] = useState(0);
 
+  // Guard: slides empty or index out of range (can happen during AnimatePresence exit)
+  if (!slides || slides.length === 0 || index >= slides.length) return null;
+
   const isLast = index === slides.length - 1;
 
   const handleNext = () => {
@@ -39,13 +42,14 @@ export default function MascotTutorial({ slides, onDismiss }: MascotTutorialProp
         exit={{ scale: 0.9, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 280, damping: 22, delay: 0.1 }}
       >
-        {/* Mascot */}
+        {/* Mascot — no speech bubble (tutorial card handles all text) */}
         <Mascot
           currentEnergy="medium"
           mood="happy"
           persistent
           size={130}
           message=""
+          suppressBubble
         />
 
         {/* Speech bubble */}

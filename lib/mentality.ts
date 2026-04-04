@@ -18,7 +18,7 @@ export const MENTALITY_CHECKS: MentalityCheck[] = [
     pillar: 'mindfulness',
     emoji: '🧘',
     title: 'Body Scan',
-    content: 'Close your eyes. Notice tension in your body — your jaw, shoulders, hands. Breathe into each area and let it soften. You\'re safe. You\'re doing great.',
+    content: 'Close your eyes. Notice tension in your body: your jaw, shoulders, hands. Breathe into each area and let it soften. You\'re safe. You\'re doing great.',
     duration: '5 min',
   },
   {
@@ -27,7 +27,7 @@ export const MENTALITY_CHECKS: MentalityCheck[] = [
     pillar: 'mindfulness',
     emoji: '🔍',
     title: 'Energy Check',
-    content: 'How are you feeling right now? What does your body need? There\'s no wrong answer — honesty with yourself is part of self-care.',
+    content: 'How are you feeling right now? What does your body need? There\'s no wrong answer. Honesty with yourself is part of self-care.',
     duration: '2 min',
   },
   {
@@ -56,7 +56,7 @@ export const MENTALITY_CHECKS: MentalityCheck[] = [
     pillar: 'emotional',
     emoji: '📖',
     title: 'Progress Reflection',
-    content: 'What\'s one thing you did today that moved you forward? It doesn\'t have to be big — celebrating small wins builds momentum.',
+    content: 'What\'s one thing you did today that moved you forward? It doesn\'t have to be big. Celebrating small wins builds momentum.',
     duration: '2 min',
   },
   {
@@ -85,7 +85,7 @@ export const MENTALITY_CHECKS: MentalityCheck[] = [
     pillar: 'physical',
     emoji: '😮‍💨',
     title: 'Progressive Muscle Relaxation',
-    content: 'Starting from your feet, tense each muscle group for 5 seconds then release. Work your way up — calves, thighs, stomach, hands, shoulders. Feel the difference.',
+    content: 'Starting from your feet, tense each muscle group for 5 seconds then release. Work your way up: calves, thighs, stomach, hands, shoulders. Feel the difference.',
     duration: '5 min',
   },
   {
@@ -94,7 +94,7 @@ export const MENTALITY_CHECKS: MentalityCheck[] = [
     pillar: 'physical',
     emoji: '🌅',
     title: 'Morning Stretch',
-    content: 'Roll your neck gently side to side. Reach both arms overhead and stretch long. Roll your shoulders back 5 times. Your body has been resting — say hello to it.',
+    content: 'Roll your neck gently side to side. Reach both arms overhead and stretch long. Roll your shoulders back 5 times. Your body has been resting, so say hello to it.',
     duration: '3 min',
   },
   {
@@ -103,7 +103,7 @@ export const MENTALITY_CHECKS: MentalityCheck[] = [
     pillar: 'physical',
     emoji: '🚶',
     title: 'Walking Meditation',
-    content: 'Walk slowly for 5 minutes. Feel each footstep. Notice the ground beneath you, the air around you. Walking is enough — you don\'t need to be anywhere but here.',
+    content: 'Walk slowly for 5 minutes. Feel each footstep. Notice the ground beneath you, the air around you. Walking is enough. You don\'t need to be anywhere but here.',
     duration: '5 min',
   },
   {
@@ -123,7 +123,7 @@ export const MENTALITY_CHECKS: MentalityCheck[] = [
     pillar: 'sensory',
     emoji: '👁️',
     title: '5-4-3-2-1 Grounding',
-    content: 'Name 5 things you can see. 4 you can touch. 3 you can hear. 2 you can smell. 1 you can taste. This pulls you into the present moment — where anxiety can\'t follow.',
+    content: 'Name 5 things you can see. 4 you can touch. 3 you can hear. 2 you can smell. 1 you can taste. This pulls you into the present moment, where anxiety can\'t follow.',
     duration: '2 min',
   },
   {
@@ -141,7 +141,7 @@ export const MENTALITY_CHECKS: MentalityCheck[] = [
     pillar: 'sensory',
     emoji: '🌿',
     title: 'Nature Focus',
-    content: 'Step outside or look through a window. Find one living thing — a tree, a bird, a plant. Watch it for 60 seconds without doing anything else. Let nature remind you to just be.',
+    content: 'Step outside or look through a window. Find one living thing: a tree, a bird, a plant. Watch it for 60 seconds without doing anything else. Let nature remind you to just be.',
     duration: '3 min',
   },
   {

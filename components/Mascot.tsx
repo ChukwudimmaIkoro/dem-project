@@ -17,6 +17,7 @@ interface MascotProps {
   streak?: number;
   pillar?: 'diet' | 'exercise' | 'mentality';
   size?: number; // SVG rendered size in px (default 96)
+  suppressBubble?: boolean; // hide speech bubble entirely (used in tutorial overlay)
 }
 
 // ─── Energy configuration ───────────────────────────────────────────────────────
@@ -210,10 +211,12 @@ export default function Mascot({
   currentEnergy = 'medium',
   userName = '',
   size = 96,
+  suppressBubble = false,
 }: MascotProps) {
   const bodyControls   = useAnimationControls(); // bounce physics
   const wrapperControls = useAnimationControls(); // energy zoom
 
+  const mountedRef    = useRef(false);
   const loopActive    = useRef(false);
   const energyRef     = useRef(currentEnergy);
   const prevEnergyRef = useRef<string | null>(null);
@@ -226,6 +229,12 @@ export default function Mascot({
   const [bodyX, setBodyX] = useState(0);
 
   const cfg = ENERGY_CONFIG[currentEnergy];
+
+  // ── Track mount state so async loop doesn't call controls after unmount ─────
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // ── Handle incoming message prop ────────────────────────────────────────────
   const idleRef = useRef<NodeJS.Timeout>();
@@ -263,7 +272,7 @@ export default function Mascot({
     energyRef.current = currentEnergy;
     setMascotColor(ENERGY_CONFIG[currentEnergy].color);
 
-    if (!isFirstRender) {
+    if (!isFirstRender && mountedRef.current) {
       // Subtle pulse on energy change (full-screen overlay in PlanView handles the big reveal)
       wrapperControls.start({
         scale: [1, 1.12, 1],
@@ -288,13 +297,14 @@ export default function Mascot({
         const targetX = (Math.random() - 0.5) * c.horizontalRange * 2;
 
         // 1. Pre-squash (anticipation)
+        if (!mountedRef.current) break;
         bodyControls.start({
           scaleY: c.squashImpact,
           scaleX: 1 / c.squashImpact,
           transition: { duration: 0.09, ease: 'easeOut' },
         });
         await sleep(90);
-        if (!loopActive.current) break;
+        if (!loopActive.current || !mountedRef.current) break;
 
         // 2. Rise to peak — ease-out (decelerating like real projectile)
         await bodyControls.start({
@@ -304,7 +314,7 @@ export default function Mascot({
           scaleX:  1 / c.squashPeak,
           transition: { duration: 0.33, ease: [0.22, 1, 0.36, 1] },
         });
-        if (!loopActive.current) break;
+        if (!loopActive.current || !mountedRef.current) break;
         setBodyY(-jumpH);
         setBodyX(targetX);
 
@@ -312,22 +322,24 @@ export default function Mascot({
         if (energyRef.current === 'high') await sleep(40);
 
         // 3. Fall — ease-in (accelerating, gravity)
+        if (!mountedRef.current) break;
         await bodyControls.start({
           y:      0,
           scaleY:  c.squashImpact,
           scaleX:  1 / c.squashImpact,
           transition: { duration: 0.28, ease: [0.55, 0, 1, 0.5] },
         });
-        if (!loopActive.current) break;
+        if (!loopActive.current || !mountedRef.current) break;
         setBodyY(0);
 
         // 4. Settle — spring overshoot gives rubber-ball feel
+        if (!mountedRef.current) break;
         await bodyControls.start({
           scaleY: 1,
           scaleX: 1,
           transition: { type: 'spring', stiffness: 420, damping: 14 },
         });
-        if (!loopActive.current) break;
+        if (!loopActive.current || !mountedRef.current) break;
 
         // 5. Rest between bounces
         const period = c.bouncePeriod[0] + Math.random() * (c.bouncePeriod[1] - c.bouncePeriod[0]);
@@ -441,13 +453,11 @@ export default function Mascot({
           </div>
         </motion.div>
 
-        {/* Ground shadow — OUTSIDE zoom wrapper so it never scales with energy zoom */}
-        <GroundShadow y={bodyY} x={bodyX} size={size} />
       </div>
 
-      {/* Speech bubble */}
+      {/* Speech bubble — hidden when suppressBubble is true (e.g. tutorial overlay) */}
       <AnimatePresence mode="wait">
-        {currentMessage && (
+        {!suppressBubble && currentMessage && (
           <motion.div
             key={currentMessage}
             initial={{ opacity: 0, y: -6, scale: 0.95 }}

@@ -92,7 +92,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'moderate',
     muscleGroup: 'full',
     emoji: '💥',
-    description: 'Push-ups, squats, planks — 3 rounds',
+    description: 'Push-ups, squats, planks: 3 rounds',
     duration: '25 min',
   },
   {
@@ -102,7 +102,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'intense',
     muscleGroup: 'full',
     emoji: '🏋️',
-    description: 'Heavy compound lifts — squats, deadlifts, bench',
+    description: 'Heavy compound lifts: squats, deadlifts, bench',
     duration: '45 min',
   },
   {
@@ -124,7 +124,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'moderate',
     muscleGroup: 'core',
     emoji: '🔥',
-    description: 'Planks, crunches, leg raises — 3 sets',
+    description: 'Planks, crunches, leg raises: 3 sets',
     duration: '20 min',
   },
   {
@@ -134,7 +134,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'light',
     muscleGroup: 'core',
     emoji: '🧱',
-    description: 'Isometric plank hold — 3 sets of 30–60 seconds',
+    description: 'Isometric plank hold, 3 sets of 30 to 60 seconds',
     duration: '10 min',
   },
   {
@@ -144,7 +144,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'moderate',
     muscleGroup: 'core',
     emoji: '🚴',
-    description: 'Alternating elbow-to-knee crunches — 3 sets of 20',
+    description: 'Alternating elbow-to-knee crunches, 3 sets of 20',
     duration: '10 min',
   },
   {
@@ -154,7 +154,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'moderate',
     muscleGroup: 'core',
     emoji: '🐛',
-    description: 'Alternating arm/leg extension on your back — 3 sets of 10',
+    description: 'Alternating arm/leg extension on your back, 3 sets of 10',
     duration: '10 min',
   },
   {
@@ -164,7 +164,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'moderate',
     muscleGroup: 'core',
     emoji: '🦵',
-    description: 'Straight-leg raises lying down — 3 sets of 15',
+    description: 'Straight-leg raises lying down, 3 sets of 15',
     duration: '10 min',
   },
 
@@ -176,7 +176,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'intense',
     muscleGroup: 'upper',
     emoji: '💪',
-    description: 'Push-ups, pull-ups, dips — 4 sets each',
+    description: 'Push-ups, pull-ups, dips: 4 sets each',
     duration: '40 min',
   },
   {
@@ -186,7 +186,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'moderate',
     muscleGroup: 'upper',
     emoji: '💪',
-    description: 'Classic push-ups — 3 sets of 10–15',
+    description: 'Classic push-ups, 3 sets of 10 to 15',
     duration: '10 min',
   },
   {
@@ -196,7 +196,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'moderate',
     muscleGroup: 'upper',
     emoji: '🔺',
-    description: 'Pike position push-ups for shoulders — 3 sets of 10',
+    description: 'Pike position push-ups for shoulders, 3 sets of 10',
     duration: '10 min',
   },
   {
@@ -206,7 +206,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'moderate',
     muscleGroup: 'upper',
     emoji: '🪑',
-    description: 'Tricep dips using a sturdy chair — 3 sets of 12',
+    description: 'Tricep dips using a sturdy chair, 3 sets of 12',
     duration: '10 min',
   },
   {
@@ -216,7 +216,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'light',
     muscleGroup: 'upper',
     emoji: '🧱',
-    description: 'Standing push-ups against a wall — great for beginners',
+    description: 'Standing push-ups against a wall, great for beginners',
     duration: '10 min',
   },
 
@@ -228,7 +228,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'intense',
     muscleGroup: 'lower',
     emoji: '🦵',
-    description: 'Squats, lunges, calf raises — 4 sets each',
+    description: 'Squats, lunges, calf raises: 4 sets each',
     duration: '40 min',
   },
   {
@@ -238,7 +238,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'moderate',
     muscleGroup: 'lower',
     emoji: '🏋️',
-    description: 'Bodyweight squats — 3 sets of 15',
+    description: 'Bodyweight squats, 3 sets of 15',
     duration: '10 min',
   },
   {
@@ -248,7 +248,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'moderate',
     muscleGroup: 'lower',
     emoji: '🦵',
-    description: 'Walking or stationary lunges — 3 sets of 10 per leg',
+    description: 'Walking or stationary lunges, 3 sets of 10 per leg',
     duration: '10 min',
   },
   {
@@ -258,7 +258,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'light',
     muscleGroup: 'lower',
     emoji: '🌉',
-    description: 'Hip thrust from the floor — 3 sets of 15',
+    description: 'Hip thrust from the floor, 3 sets of 15',
     duration: '10 min',
   },
   {
@@ -268,7 +268,7 @@ export const EXERCISES: Exercise[] = [
     intensity: 'light',
     muscleGroup: 'lower',
     emoji: '🦶',
-    description: 'Standing calf raises — 3 sets of 20',
+    description: 'Standing calf raises, 3 sets of 20',
     duration: '8 min',
   },
 ];
