@@ -190,7 +190,7 @@ export function generatePlan(
   });
 
   return {
-    id:               `plan-${Date.now()}`,
+    id:               typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `plan-${Date.now()}`,
     createdAt:        now.toISOString(),
     startDate:        now.toISOString(),
     planLength,

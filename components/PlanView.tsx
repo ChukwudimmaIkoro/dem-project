@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ThreeDayPlan, DayPlan, EnergyLevel } from '@/types';
 import {
   loadAppState, updatePlan, clearAppState,
   saveCurrentPlan, hasShownEnergyModal, saveEnergyModalShown,
 } from '@/lib/storage';
+import { syncPlan, syncUserProfile } from '@/lib/supabaseStorage';
 import {
   isDayComplete, calculateStreak,
   generatePlan, generateThreeDayPlan, shuffleDietMeals,
@@ -29,6 +30,7 @@ import AIHealthInsights from './AIHealthInsights';
 import AIExerciseCoach from './AIExerciseCoach';
 import PreferencesModal from './PreferencesModal';
 import FloatingMascot from './FloatingMascot';
+import { useDragScroll } from '@/hooks/useDragScroll';
 import MascotTutorial from './MascotTutorial';
 import { TUTORIALS } from '@/lib/tutorials';
 import { useTutorial } from '@/hooks/useTutorial';
@@ -86,11 +88,16 @@ function DiceIcon({ className = '' }: { className?: string }) {
 
 // ─── Props ──────────────────────────────────────────────────────────────────────
 
-interface PlanViewProps { onReset: () => void }
+interface PlanViewProps {
+  onReset: () => void;
+  onSignOut: () => void;
+  authUserEmail: string;
+  authUserName: string;
+}
 
 // ─── Main component ─────────────────────────────────────────────────────────────
 
-export default function PlanView({ onReset }: PlanViewProps) {
+export default function PlanView({ onReset, onSignOut, authUserEmail, authUserName }: PlanViewProps) {
   const [plan,            setPlan]           = useState<ThreeDayPlan | null>(null);
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
@@ -116,9 +123,18 @@ export default function PlanView({ onReset }: PlanViewProps) {
   // Preferences editing
   const [editingPrefs, setEditingPrefs] = useState<'diet' | 'exercise' | 'mentality' | null>(null);
 
+  // Dev panel — visible by default in DEV_MODE; toggle with Konami to hide/show
+  const [devUnlocked,  setDevUnlocked]  = useState(true);
+  const konamiProgress = useRef(0);
+
   // Tutorials — one per context
-  const homeTutorial     = useTutorial('home');
-  const dietTutorial     = useTutorial('diet');
+  const homeTutorial          = useTutorial('home');
+  const streakCompleteTutorial = useTutorial('streakComplete');
+  const dietTutorial          = useTutorial('diet');
+
+  // Drag-to-scroll refs for horizontal scrollable containers
+  const dayNavDrag      = useDragScroll();
+  const overviewDrag    = useDragScroll();
   const exerciseTutorial = useTutorial('exercise');
   const mentalityTutorial = useTutorial('mentality');
   const progressTutorial = useTutorial('progress');
@@ -129,20 +145,61 @@ export default function PlanView({ onReset }: PlanViewProps) {
       setPlan(state.currentPlan);
       // In production: jump to the real-time active day. In dev: fall back to first incomplete.
       const realtimeIdx = getActiveDayIndex(state.currentPlan);
-      const firstIncomplete = state.currentPlan.days.findIndex(d => !isDayComplete(d));
-      const dayIdx = DEV_MODE
-        ? (firstIncomplete === -1 ? state.currentPlan.days.length - 1 : firstIncomplete)
-        : realtimeIdx;
-      setCurrentDayIndex(dayIdx);
+      // Always clamp to the real-time active day — users can never land on a future day.
+      // Dev panel "Next Day" is the only way to advance in DEV_MODE.
+      setCurrentDayIndex(realtimeIdx);
       if (state.user?.name)          setUserName(state.user.name);
       if (state.user?.selectedFoods) setUserFoods(state.user.selectedFoods);
 
-      const day = state.currentPlan.days[dayIdx];
+      const day = state.currentPlan.days[realtimeIdx];
       if (!hasShownEnergyModal(day.dayNumber) && !(day.energyLocked ?? false)) {
         setTimeout(() => setShowEnergyModal(true), 600);
       }
     }
+
+    // Konami code listener — only active in DEV_MODE (local builds)
+    const handleKonami = (e: KeyboardEvent) => {
+      if (!DEV_MODE) return;
+      const seq = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+      if (e.key === seq[konamiProgress.current]) {
+        konamiProgress.current += 1;
+        if (konamiProgress.current === seq.length) {
+          setDevUnlocked(v => !v); // toggle so it can be re-hidden
+          konamiProgress.current = 0;
+        }
+      } else {
+        konamiProgress.current = e.key === seq[0] ? 1 : 0;
+      }
+    };
+    window.addEventListener('keydown', handleKonami);
+    return () => window.removeEventListener('keydown', handleKonami);
   }, []);
+
+  // Background sync — every plan state change writes to Supabase (fire and forget)
+  useEffect(() => {
+    if (plan) syncPlan(plan).catch(() => {});
+  }, [plan]);
+
+  // Auto-restart: if the plan is fully complete AND real time has moved past the last day,
+  // silently generate a fresh same-length plan so the user always has something to do.
+  useEffect(() => {
+    if (!plan) return;
+    const allDone = plan.days.every(d => isDayComplete(d));
+    if (!allDone) return;
+    const activeDayIdx = getActiveDayIndex(plan);
+    // activeDayIdx === planLength - 1 means we're still on the last day in real time.
+    // Once real time advances (activeDayIdx would exceed last day), restart.
+    if (activeDayIdx >= (plan.planLength ?? 3)) {
+      const state = loadAppState();
+      if (!state.user) return;
+      const newPlan = generatePlan(state.user, plan.planLength ?? 3);
+      newPlan.historicalStreak = plan.historicalStreak ?? 0;
+      newPlan.dummyCurrency    = plan.dummyCurrency ?? 0;
+      saveCurrentPlan(newPlan);
+      setPlan(newPlan);
+      setCurrentDayIndex(0);
+    }
+  }, [plan]);
 
   // Mascot message on pillar tab change
   const getMascotTabMessage = (pillar: 'diet' | 'exercise' | 'mentality') => {
@@ -190,6 +247,8 @@ export default function PlanView({ onReset }: PlanViewProps) {
   };
 
   const toggleTask = (pillar: 'diet' | 'exercise' | 'mentality') => {
+    // Once a pillar is checked off it cannot be unchecked — protects streak integrity
+    if (currentDay.completed[pillar]) return;
     const wasComplete = isComplete;
     updatePlan(p => {
       const updated = { ...p, days: [...p.days] };
@@ -197,7 +256,7 @@ export default function PlanView({ onReset }: PlanViewProps) {
         ...updated.days[currentDayIndex],
         completed: {
           ...updated.days[currentDayIndex].completed,
-          [pillar]: !updated.days[currentDayIndex].completed[pillar],
+          [pillar]: true,
         },
       };
       // Lock energy once all 3 pillars are done
@@ -309,28 +368,57 @@ export default function PlanView({ onReset }: PlanViewProps) {
   // ── Account tab ──────────────────────────────────────────────────────────
 
   if (activeBottomTab === 'account') {
+    const displayInitial = (authUserName || authUserEmail || 'D')[0].toUpperCase();
     return (
       <EnergyBackground energy={currentDay.energyLevel}>
         <div className="min-h-screen pb-24 p-4">
-          <div className="text-center pt-10">
-            <Card className="mb-4">
-              <h2 className="text-2xl font-black text-gray-900 mb-2">Account</h2>
-              <p className="text-gray-500 mb-5 text-sm">
-                Profile customization, preferences, and more are on the way!
-              </p>
-              <Button variant="ghost" onClick={handleReset} className="w-full text-red-500">
-                <RotateCcw className="w-4 h-4 mr-2 inline" />
-                Reset Progress
+          <div className="pt-8 space-y-4">
+
+            {/* Profile card */}
+            <Card>
+              <div className="flex items-center gap-3 mb-4">
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-lg flex-shrink-0"
+                  style={{ background: theme.accent }}
+                >
+                  {displayInitial}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-black text-gray-900 text-base truncate">
+                    {authUserName || userName || 'Dem User'}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate">{authUserEmail}</p>
+                </div>
+              </div>
+              <div
+                className="rounded-xl px-3 py-2 mb-4 text-xs font-semibold text-center"
+                style={{ background: theme.accentLight, color: theme.accentText }}
+              >
+                Progress synced to your account
+              </div>
+              <Button variant="ghost" onClick={onSignOut} className="w-full text-gray-500">
+                Sign Out
               </Button>
             </Card>
+
+            {/* Danger zone */}
+            <Card>
+              <h3 className="font-black text-gray-700 text-sm mb-3">Danger Zone</h3>
+              <Button variant="ghost" onClick={handleReset} className="w-full text-red-500">
+                <RotateCcw className="w-4 h-4 mr-2 inline" />
+                Reset All Progress
+              </Button>
+            </Card>
+
           </div>
+
           <FloatingMascot
             energy={currentDay.energyLevel}
             userName={userName}
-            firstVisitMessage={`Hey ${userName || 'friend'}! This is your Account tab. Settings and profile customization are on the way!`}
+            firstVisitMessage={`Hey ${userName || 'friend'}! This is your account page.`}
           />
           <BottomNav activeTab={activeBottomTab} onTabChange={setActiveBottomTab} accentColor={theme.accent} />
-          <DevPanel show={showDevPanel} onToggle={() => setShowDevPanel(v => !v)} onAction={handleDevAction} />
+          <DevPanel show={showDevPanel} onToggle={() => setShowDevPanel(v => !v)} onAction={handleDevAction} devUnlocked={devUnlocked} />
         </div>
       </EnergyBackground>
     );
@@ -341,8 +429,10 @@ export default function PlanView({ onReset }: PlanViewProps) {
   if (activeBottomTab === 'progress') {
     const energyHistory     = plan.days.map(d => d.energyLevel);
     const completionHistory = plan.days.map(d => d.completed);
-    const allDaysComplete   = plan.days.every(d => isDayComplete(d));
-    const planLength        = plan.planLength ?? 3;
+    const allDaysComplete      = plan.days.every(d => isDayComplete(d));
+    const planLength           = plan.planLength ?? 3;
+    // Streak goal selector only unlocks after the user has completed at least one full streak
+    const streakGoalUnlocked   = (plan.historicalStreak ?? 0) > 0 || allDaysComplete;
 
     return (
       <EnergyBackground energy={currentDay.energyLevel}>
@@ -371,8 +461,13 @@ export default function PlanView({ onReset }: PlanViewProps) {
             <Card className="mb-4">
               <h3 className="font-black text-gray-800 mb-3 text-base">{planLength}-Day Overview</h3>
               <div
+                ref={overviewDrag.ref}
                 className="flex gap-2 overflow-x-auto pb-1"
-                style={{ scrollbarWidth: 'none' }}
+                style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+                onMouseDown={overviewDrag.onMouseDown}
+                onMouseMove={overviewDrag.onMouseMove}
+                onMouseUp={overviewDrag.onMouseUp}
+                onMouseLeave={overviewDrag.onMouseLeave}
               >
                 {plan.days.map((day, idx) => {
                   const done  = isDayComplete(day);
@@ -397,7 +492,7 @@ export default function PlanView({ onReset }: PlanViewProps) {
               </div>
             </Card>
 
-            {/* Persistent streak goal selector */}
+            {/* Persistent streak goal selector — locked until first 3-day streak done */}
             <Card className="mb-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-black text-gray-800 text-base">Streak Goal</h3>
@@ -412,32 +507,47 @@ export default function PlanView({ onReset }: PlanViewProps) {
                   </motion.span>
                 )}
               </div>
-              <div className="flex gap-1.5">
-                {([3, 5, 7, 14, 30] as const).map(days => {
-                  const isCurrent = planLength === days;
-                  return (
-                    <motion.button
-                      key={days}
-                      onClick={() => handleStreakGoalChange(days)}
-                      className="flex-1 py-2.5 rounded-xl text-xs font-black"
-                      style={{
-                        background: isCurrent ? theme.accent : '#f3f4f6',
-                        color:      isCurrent ? 'white' : '#6b7280',
-                        boxShadow:  isCurrent ? `0 3px 0 0 ${theme.accentDark}` : '0 2px 0 0 #d1d5db',
-                      }}
-                      whileTap={{ scale: 0.95, y: 2, boxShadow: 'none' }}
-                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                    >
-                      {days}d
-                    </motion.button>
-                  );
-                })}
-              </div>
-              <p className="text-[11px] text-gray-400 mt-2 text-center">
-                {allDaysComplete
-                  ? 'Tap a length to begin your next streak!'
-                  : 'Changing mid-plan will restart your current progress.'}
-              </p>
+              {streakGoalUnlocked ? (
+                <>
+                  <div className="flex gap-1.5">
+                    {([3, 5, 7, 14, 30] as const).map(days => {
+                      const isCurrent = planLength === days;
+                      return (
+                        <motion.button
+                          key={days}
+                          onClick={() => handleStreakGoalChange(days)}
+                          className="flex-1 py-2.5 rounded-xl text-xs font-black"
+                          style={{
+                            background: isCurrent ? theme.accent : '#f3f4f6',
+                            color:      isCurrent ? 'white' : '#6b7280',
+                            boxShadow:  isCurrent ? `0 3px 0 0 ${theme.accentDark}` : '0 2px 0 0 #d1d5db',
+                          }}
+                          whileTap={{ scale: 0.95, y: 2, boxShadow: 'none' }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                        >
+                          {days}d
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-2 text-center">
+                    {allDaysComplete
+                      ? 'Tap a length to begin your next streak!'
+                      : 'Changing mid-plan will restart your current progress.'}
+                  </p>
+                </>
+              ) : (
+                <div
+                  className="rounded-2xl px-4 py-3 text-center"
+                  style={{ background: '#f9fafb', border: '2px solid #e5e7eb' }}
+                >
+                  <div className="text-2xl mb-1">🔒</div>
+                  <p className="text-sm font-black text-gray-600">Complete your first 3-day streak to unlock longer goals!</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {plan.days.filter(d => isDayComplete(d)).length} / 3 days done
+                  </p>
+                </div>
+              )}
             </Card>
 
             {/* Streak goal change warning modal */}
@@ -510,7 +620,7 @@ export default function PlanView({ onReset }: PlanViewProps) {
               <MascotTutorial key="tut-progress" slides={TUTORIALS.progress} onDismiss={progressTutorial.dismiss} />
             )}
           </AnimatePresence>
-          <DevPanel show={showDevPanel} onToggle={() => setShowDevPanel(v => !v)} onAction={handleDevAction} />
+          <DevPanel show={showDevPanel} onToggle={() => setShowDevPanel(v => !v)} onAction={handleDevAction} devUnlocked={devUnlocked} />
         </div>
       </EnergyBackground>
     );
@@ -642,8 +752,13 @@ export default function PlanView({ onReset }: PlanViewProps) {
 
         {/* Day navigator — horizontal scroll for long plans */}
         <div
+          ref={dayNavDrag.ref}
           className="flex gap-2 mb-5 overflow-x-auto pb-1"
           style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+          onMouseDown={dayNavDrag.onMouseDown}
+          onMouseMove={dayNavDrag.onMouseMove}
+          onMouseUp={dayNavDrag.onMouseUp}
+          onMouseLeave={dayNavDrag.onMouseLeave}
         >
           {plan.days.map((day, idx) => {
             const done        = isDayComplete(day);
@@ -824,7 +939,7 @@ export default function PlanView({ onReset }: PlanViewProps) {
           </motion.div>
         )}
       </AnimatePresence>
-      <DevPanel show={showDevPanel} onToggle={() => setShowDevPanel(v => !v)} onAction={handleDevAction} />
+      <DevPanel show={showDevPanel} onToggle={() => setShowDevPanel(v => !v)} onAction={handleDevAction} devUnlocked={devUnlocked} />
 
       {/* Preferences edit modal */}
       <AnimatePresence>
@@ -833,15 +948,23 @@ export default function PlanView({ onReset }: PlanViewProps) {
             key={editingPrefs}
             pillar={editingPrefs}
             onClose={() => setEditingPrefs(null)}
-            onSaved={(newPlan) => { setPlan(newPlan); setCurrentDayIndex(0); setEditingPrefs(null); }}
+            onSaved={(newPlan) => {
+              const s = loadAppState();
+              if (s.user) syncUserProfile(s.user).catch(() => {});
+              setPlan(newPlan);
+              setCurrentDayIndex(0);
+              setEditingPrefs(null);
+            }}
           />
         )}
       </AnimatePresence>
 
-      {/* Mascot tutorials — shown once per context, keys required by AnimatePresence */}
+      {/* Mascot tutorials — shown once ever, keys required by AnimatePresence */}
       <AnimatePresence>
         {homeTutorial.shouldShow ? (
           <MascotTutorial key="tut-home" slides={TUTORIALS.home} onDismiss={homeTutorial.dismiss} />
+        ) : plan.days.every(d => isDayComplete(d)) && streakCompleteTutorial.shouldShow ? (
+          <MascotTutorial key="tut-streak-complete" slides={TUTORIALS.streakComplete} onDismiss={streakCompleteTutorial.dismiss} />
         ) : activePillar === 'diet' && dietTutorial.shouldShow ? (
           <MascotTutorial key="tut-diet" slides={TUTORIALS.diet} onDismiss={dietTutorial.dismiss} />
         ) : activePillar === 'exercise' && exerciseTutorial.shouldShow ? (
@@ -880,13 +1003,14 @@ function EnergyBackground({ energy, children }: { energy: EnergyLevel; children:
 // ─── Dev panel (DEV_MODE only) ──────────────────────────────────────────────────
 
 function DevPanel({
-  show, onToggle, onAction,
+  show, onToggle, onAction, devUnlocked,
 }: {
   show: boolean;
   onToggle: () => void;
   onAction: (a: 'next' | 'complete' | 'reset') => void;
+  devUnlocked: boolean;
 }) {
-  if (!DEV_MODE) return null;
+  if (!DEV_MODE || !devUnlocked) return null;
   return (
     <>
       <motion.button
