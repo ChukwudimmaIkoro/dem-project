@@ -42,9 +42,8 @@ export default function Home() {
     if (cloudUser) saveUserProfile(cloudUser);
     if (cloudPlan) saveCurrentPlan(cloudPlan);
 
-    const state = loadAppState();
-    const hasApp = state.hasCompletedOnboarding && !!state.currentPlan;
-    setScreen(hasApp ? 'app' : 'onboarding');
+    // Cloud plan is the authoritative source — don't let stale localStorage skip onboarding
+    setScreen(cloudPlan ? 'app' : 'onboarding');
   }, []);
 
   useEffect(() => {

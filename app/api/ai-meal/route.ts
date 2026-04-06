@@ -45,13 +45,16 @@ Produce ONLY this JSON, no other text:
 Use 4-7 ingredients. Quantities must be realistic (e.g. '2 cups', '1 tbsp', '3 oz'). Steps must be actionable and specific. Make it genuinely delicious and practical to cook at home.`;
 
     const message = await callClaude({
-      max_tokens: 600,
+      max_tokens: 900,
       messages: [{ role: 'user', content: prompt }],
     });
 
     const rawText = message.content[0].type === 'text' ? message.content[0].text.trim() : '';
-    const cleaned = rawText.replace(/```json|```/g, '').trim();
-    const recipe = JSON.parse(cleaned);
+    // Extract JSON object robustly — handles any prose Claude adds before/after
+    const start = rawText.indexOf('{');
+    const end   = rawText.lastIndexOf('}');
+    if (start === -1 || end === -1) throw new Error('No JSON in response');
+    const recipe = JSON.parse(rawText.slice(start, end + 1));
 
     return Response.json({ recipe, success: true });
   } catch (error) {
