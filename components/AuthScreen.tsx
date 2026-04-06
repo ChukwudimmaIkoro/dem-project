@@ -23,12 +23,13 @@ function validatePassword(pw: string): string | null {
 }
 
 export default function AuthScreen({ onAuth }: AuthScreenProps) {
-  const [mode,     setMode]     = useState<Mode>('signup');
-  const [name,     setName]     = useState('');
-  const [email,    setEmail]    = useState('');
-  const [password, setPassword] = useState('');
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState('');
+  const [mode,        setMode]        = useState<Mode>('signup');
+  const [name,        setName]        = useState('');
+  const [email,       setEmail]       = useState('');
+  const [password,    setPassword]    = useState('');
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState('');
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +49,9 @@ export default function AuthScreen({ onAuth }: AuthScreenProps) {
           options: { data: { name: name.trim() || 'Friend' } },
         });
         if (signUpError) throw signUpError;
+        // If session is null, email confirmation is required — show pending state.
+        // onAuthStateChange fires automatically when user confirms.
+        if (!data.session) { setPendingEmail(email); return; }
         if (data.user) onAuth(data.user);
       } else {
         const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
@@ -60,6 +64,45 @@ export default function AuthScreen({ onAuth }: AuthScreenProps) {
       setLoading(false);
     }
   };
+
+  // ── Email confirmation pending ───────────────────────────────────────────────
+  if (pendingEmail) {
+    return (
+      <div
+        className="min-h-screen flex flex-col items-center justify-center px-4 py-8"
+        style={{ background: 'linear-gradient(160deg, #f0fdf4 0%, #eff6ff 100%)' }}
+      >
+        <motion.div
+          className="bg-white rounded-3xl shadow-xl w-full max-w-sm p-8 text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 280, damping: 26 }}
+        >
+          <Mascot
+            message="Check your inbox!"
+            mood="excited"
+            persistent
+            currentEnergy="high"
+            size={90}
+          />
+          <h2 className="text-2xl font-black text-gray-900 mt-4">Confirm your email</h2>
+          <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+            We sent a confirmation link to<br />
+            <span className="font-bold text-gray-700">{pendingEmail}</span>
+          </p>
+          <p className="text-sm text-gray-400 mt-4 leading-relaxed">
+            Click the link in that email to activate your account and jump into Dem.
+          </p>
+          <button
+            onClick={() => { setPendingEmail(null); setMode('signin'); setPassword(''); }}
+            className="mt-6 text-xs text-dem-green-600 font-bold underline underline-offset-2"
+          >
+            Already confirmed? Sign in
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div
