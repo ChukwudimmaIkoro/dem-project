@@ -733,7 +733,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
               animate={{ color: theme.accent }}
               transition={{ duration: 0.6 }}
             >
-              Dem
+              Dem V2
             </motion.h1>
             <p className="text-sm text-gray-500 font-semibold">Day {currentDay.dayNumber} of {plan.planLength ?? 3}</p>
           </div>
