@@ -5,64 +5,76 @@
 @layer base {
   html {
     @apply antialiased;
+    -webkit-tap-highlight-color: transparent;
   }
-  
+
   body {
-    @apply bg-gradient-to-br from-dem-green-50 to-dem-blue-50 min-h-screen;
+    @apply min-h-screen;
+    background: #f0fdf4;
+    overscroll-behavior: none;
+  }
+
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
 @layer components {
-  /* Duolingo-style button */
-  .btn-primary {
-    @apply bg-dem-green-500 hover:bg-dem-green-600 text-white font-bold py-4 px-6 rounded-2xl shadow-lg active:shadow-md active:translate-y-0.5 transition-all duration-150;
-  }
-  
-  .btn-secondary {
-    @apply bg-white hover:bg-gray-50 text-dem-green-700 font-bold py-4 px-6 rounded-2xl border-2 border-dem-green-200 shadow-md active:shadow-sm active:translate-y-0.5 transition-all duration-150;
-  }
-  
-  /* Card styles */
-  .card {
-    @apply bg-white rounded-3xl shadow-lg p-6;
-  }
-  
-  /* Mobile-safe tap targets */
   .tap-target {
     @apply min-h-[44px] min-w-[44px];
   }
+
+  /* Duolingo-style bottom border on cards for depth */
+  .card-3d {
+    box-shadow: 0 4px 0 0 rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .card-3d:active {
+    box-shadow: 0 0px 0 0 rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
+    transform: translateY(3px);
+  }
+
+  /* Duolingo-style button with bottom border for 3D effect */
+  .btn-3d {
+    box-shadow: 0 5px 0 0 rgba(0,0,0,0.18);
+    transition: box-shadow 80ms ease, transform 80ms ease;
+  }
+  .btn-3d:active {
+    box-shadow: 0 2px 0 0 rgba(0,0,0,0.18);
+    transform: translateY(3px);
+  }
 }
 
+/* Keyframes kept for fallback use */
 @keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes bounce-in {
-  0% {
-    transform: scale(0.3);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.05);
-  }
-  70% {
-    transform: scale(0.9);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+  0%   { transform: scale(0.3); opacity: 0; }
+  50%  { transform: scale(1.05); }
+  70%  { transform: scale(0.9); }
+  100% { transform: scale(1); opacity: 1; }
 }
 
-.animate-fade-in {
-  animation: fade-in 0.3s ease-out;
+@keyframes pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
 }
 
-.animate-bounce-in {
-  animation: bounce-in 0.5s ease-out;
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.animate-fade-in   { animation: fade-in 0.3s ease-out; }
+.animate-bounce-in { animation: bounce-in 0.5s ease-out; }
+.animate-pop       { animation: pop 0.25s ease-out; }
+
+.shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }

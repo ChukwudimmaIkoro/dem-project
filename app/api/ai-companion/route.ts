@@ -1,9 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { callClaude } from '@/lib/ai';
 import { NextRequest } from 'next/server';
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +18,7 @@ export async function POST(req: NextRequest) {
     const prompt = `You are Dem, a warm and encouraging AI health companion. Generate a SHORT, personalized message (max 12 words) for:
 
 Patient name: ${displayName}
-Day: ${dayNumber} of their 3-day plan
+Day: ${dayNumber} of their plan
 Energy today: ${energyDesc}
 Current focus: ${pillarContext}
 Tasks completed today: ${completedTasks?.length ?? 0}
@@ -38,8 +34,7 @@ Rules:
 - Vary style: sometimes a question, sometimes a statement, sometimes a fun observation
 - Do NOT start with "I" or repeat the same pattern every time`;
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+    const message = await callClaude({
       max_tokens: 60,
       messages: [{ role: 'user', content: prompt }],
     });
@@ -49,7 +44,6 @@ Rules:
     return Response.json({ message: text });
   } catch (error) {
     console.error('AI companion error:', error);
-    // Graceful fallback - app still works without AI
     return Response.json({ message: "Keep going, you've got this!" });
   }
 }

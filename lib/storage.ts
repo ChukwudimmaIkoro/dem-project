@@ -22,9 +22,19 @@ export interface CachedInsight {
   alerts: { severity: string; type: string; message: string; recommendation: string }[];
 }
 
+export interface CachedExerciseCoach {
+  cue: string;
+  steps: string[];
+  formTips: string[];
+  modification: string;
+  searchQuery: string;
+}
+
 export interface AICache {
+  planId: string;
   recipes: Record<string, CachedRecipe>;
   insights: Record<string, CachedInsight>;
+  exercises: Record<string, CachedExerciseCoach>;
 }
 
 // App State
@@ -88,12 +98,25 @@ export function hasShownEnergyModal(dayNumber: number): boolean {
 }
 
 // AI Cache
+function getEmptyCache(): AICache {
+  const state = loadAppState();
+  return { planId: state.currentPlan?.id ?? '', recipes: {}, insights: {}, exercises: {} };
+}
+
 function loadAICache(): AICache {
-  if (typeof window === 'undefined') return { recipes: {}, insights: {} };
+  if (typeof window === 'undefined') return getEmptyCache();
   try {
     const stored = localStorage.getItem(AI_CACHE_KEY);
-    return stored ? JSON.parse(stored) : { recipes: {}, insights: {} };
-  } catch { return { recipes: {}, insights: {} }; }
+    if (!stored) return getEmptyCache();
+    const cache: AICache = JSON.parse(stored);
+    // Invalidate cache if it belongs to a different plan
+    const currentPlanId = loadAppState().currentPlan?.id ?? '';
+    if (cache.planId !== currentPlanId) {
+      localStorage.removeItem(AI_CACHE_KEY);
+      return getEmptyCache();
+    }
+    return cache;
+  } catch { return getEmptyCache(); }
 }
 
 function saveAICache(cache: AICache): void {
@@ -119,6 +142,18 @@ export function getCachedInsight(dayNumber: number): CachedInsight | null {
 export function setCachedInsight(dayNumber: number, insight: CachedInsight): void {
   const cache = loadAICache();
   cache.insights[`${dayNumber}`] = insight;
+  saveAICache(cache);
+}
+
+export function getCachedExerciseCoach(exerciseId: string, energyLevel: string): CachedExerciseCoach | null {
+  const cache = loadAICache();
+  return (cache.exercises ?? {})[`${exerciseId}-${energyLevel}`] ?? null;
+}
+
+export function setCachedExerciseCoach(exerciseId: string, energyLevel: string, coaching: CachedExerciseCoach): void {
+  const cache = loadAICache();
+  if (!cache.exercises) cache.exercises = {};
+  cache.exercises[`${exerciseId}-${energyLevel}`] = coaching;
   saveAICache(cache);
 }
 

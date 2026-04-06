@@ -1,9 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { callClaude } from '@/lib/ai';
 import { NextRequest } from 'next/server';
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 export async function POST(req: NextRequest) {
   try {
@@ -54,8 +50,7 @@ Respond in this EXACT JSON format. Do NOT use any emoji characters anywhere in y
   "careNote": "Brief clinical note for care team (max 20 words, no emoji, clinical tone)"
 }`;
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+    const message = await callClaude({
       max_tokens: 200,
       messages: [{ role: 'user', content: prompt }],
     });
