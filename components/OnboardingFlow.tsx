@@ -1,215 +1,518 @@
 'use client';
 
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { UserProfile } from '@/types';
 import { FOODS } from '@/lib/foods';
+import { EXERCISES } from '@/lib/exercises';
+import { MENTALITY_CHECKS } from '@/lib/mentality';
 import { generateThreeDayPlan } from '@/lib/planGenerator';
 import { saveUserProfile, saveCurrentPlan } from '@/lib/storage';
+import { syncUserProfile, syncPlan } from '@/lib/supabaseStorage';
 import { Button } from './Button';
 import { Card } from './Card';
 import { Check } from 'lucide-react';
 import FoodPieChart from './FoodPieChart';
 import Mascot from './Mascot';
+import FloatingMascot from './FloatingMascot';
 
 interface OnboardingFlowProps {
+  userName: string;   // from auth metadata — no name entry step needed
   onComplete: () => void;
 }
 
-export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
-  const [step, setStep] = useState(1);
-  const [name, setName] = useState('');
-  const [selectedFoods, setSelectedFoods] = useState<string[]>([]);
-  const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
-  const [selectedMentality, setSelectedMentality] = useState<string[]>([]);
+const TOTAL_STEPS = 4;
 
-  const toggleFood = (foodId: string) => {
-    setSelectedFoods(prev => 
-      prev.includes(foodId) 
-        ? prev.filter(id => id !== foodId)
-        : [...prev, foodId]
-    );
+const STEP_NAMES = ['Your Goals', 'Your Foods', 'Your Exercises', 'Your Mind'];
+
+const GOAL_OPTIONS = [
+  { id: 'routine',  emoji: '🔄', label: 'Start & maintain a routine' },
+  { id: 'eat',      emoji: '🥗', label: 'Eat better' },
+  { id: 'exercise', emoji: '💪', label: 'Exercise more' },
+  { id: 'mind',     emoji: '🧘', label: 'Rebalance my mind' },
+  { id: 'recover',  emoji: '💊', label: 'Recover & heal' },
+  { id: 'all',      emoji: '✨', label: 'All of the above' },
+];
+
+const FOOD_CATEGORIES = {
+  fruit:         '🍎 Fruits',
+  vegetable:     '🥦 Vegetables',
+  grain:         '🌾 Grains',
+  protein:       '🍗 Proteins',
+  'healthy-fat': '🥑 Healthy Fats',
+} as const;
+
+const EXERCISE_GROUPS = {
+  lower:  '🦵 Lower Body',
+  upper:  '💪 Upper Body',
+  core:   '🔥 Core',
+  full:   '💥 Full Body',
+  cardio: '🏃 Cardio',
+} as const;
+
+const MENTALITY_PILLARS = {
+  mindfulness: '🧘 Mindfulness',
+  physical:    '😮‍💨 Physical',
+  emotional:   '💚 Emotional',
+  sensory:     '👁️ Sensory',
+} as const;
+
+// ── Reusable selection grid ─────────────────────────────────────────────────
+
+interface SelectionItem { id: string; emoji: string; name: string; }
+
+function SelectionGrid({ items, selected, onToggle }: {
+  items: SelectionItem[];
+  selected: string[];
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {items.map(item => {
+        const isSelected = selected.includes(item.id);
+        return (
+          <motion.button
+            key={item.id}
+            onClick={() => onToggle(item.id)}
+            className="relative px-3 py-2.5 rounded-xl border-2 text-left overflow-hidden"
+            style={{
+              borderColor: isSelected ? '#22c55e' : '#e5e7eb',
+              background:  isSelected ? '#f0fdf4' : 'white',
+            }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-lg flex-shrink-0">{item.emoji}</span>
+                <span className="text-sm font-semibold text-gray-800 truncate">{item.name}</span>
+              </div>
+              <AnimatePresence>
+                {isSelected && (
+                  <motion.div
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                    className="flex-shrink-0 ml-1"
+                  >
+                    <Check className="w-4 h-4 text-dem-green-600" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Main component ──────────────────────────────────────────────────────────
+
+export default function OnboardingFlow({ userName, onComplete }: OnboardingFlowProps) {
+  const [step,              setStep]              = useState(1);
+  const [selectedGoals,     setSelectedGoals]     = useState<string[]>([]);
+  const [selectedFoods,     setSelectedFoods]     = useState<string[]>([]);
+  const [noFoodPref,        setNoFoodPref]        = useState(false);
+  const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
+  const [noExercisePref,    setNoExercisePref]    = useState(false);
+  const [selectedMentality, setSelectedMentality] = useState<string[]>([]);
+  const [noMentalityPref,   setNoMentalityPref]   = useState(false);
+
+  const displayName = userName.trim() || 'Friend';
+
+  // Pre-group items
+  const foodsByCategory = {
+    fruit:         FOODS.filter(f => f.category === 'fruit'),
+    vegetable:     FOODS.filter(f => f.category === 'vegetable'),
+    grain:         FOODS.filter(f => f.category === 'grain'),
+    protein:       FOODS.filter(f => f.category === 'protein'),
+    'healthy-fat': FOODS.filter(f => f.category === 'healthy-fat'),
+  };
+  const exercisesByGroup = {
+    lower:  EXERCISES.filter(e => e.muscleGroup === 'lower'),
+    upper:  EXERCISES.filter(e => e.muscleGroup === 'upper'),
+    core:   EXERCISES.filter(e => e.muscleGroup === 'core'),
+    full:   EXERCISES.filter(e => e.muscleGroup === 'full'),
+    cardio: EXERCISES.filter(e => e.muscleGroup === 'cardio'),
+  };
+  const mentalityByPillar = {
+    mindfulness: MENTALITY_CHECKS.filter(m => m.pillar === 'mindfulness'),
+    physical:    MENTALITY_CHECKS.filter(m => m.pillar === 'physical'),
+    emotional:   MENTALITY_CHECKS.filter(m => m.pillar === 'emotional'),
+    sensory:     MENTALITY_CHECKS.filter(m => m.pillar === 'sensory'),
   };
 
+  // Toggle helpers
+  const toggleGoal = (goalId: string) => {
+    if (goalId === 'all') {
+      setSelectedGoals(prev => prev.includes('all') ? [] : GOAL_OPTIONS.map(g => g.id));
+    } else {
+      setSelectedGoals(prev => {
+        const without = prev.filter(id => id !== 'all');
+        return without.includes(goalId) ? without.filter(id => id !== goalId) : [...without, goalId];
+      });
+    }
+  };
+
+  const toggle = (setter: React.Dispatch<React.SetStateAction<string[]>>) =>
+    (id: string) => setter(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
   const handleComplete = () => {
-    // Create user profile
     const user: UserProfile = {
-      name: name || 'Friend',
-      selectedFoods,
+      name:              displayName,
+      goals:             selectedGoals,
+      selectedFoods:     noFoodPref     ? [] : selectedFoods,
+      selectedExercises: noExercisePref ? [] : selectedExercises,
+      selectedMentality: noMentalityPref ? [] : selectedMentality,
+      noFoodPreference:      noFoodPref,
+      noExercisePreference:  noExercisePref,
+      noMentalityPreference: noMentalityPref,
       createdAt: new Date().toISOString(),
     };
-
-    // Generate plan
     const plan = generateThreeDayPlan(user);
-
-    // Save to localStorage
     saveUserProfile(user);
     saveCurrentPlan(plan);
-
-    // Navigate to plan view
+    // Sync to Supabase immediately (fire and forget)
+    syncUserProfile(user).catch(() => {});
+    syncPlan(plan).catch(() => {});
     onComplete();
   };
 
-  // Group foods by category
-  const foodsByCategory = {
-    fruit: FOODS.filter(f => f.category === 'fruit'),
-    vegetable: FOODS.filter(f => f.category === 'vegetable'),
-    grain: FOODS.filter(f => f.category === 'grain'),
-    protein: FOODS.filter(f => f.category === 'protein'),
-    'healthy-fat': FOODS.filter(f => f.category === 'healthy-fat'),
+  const hasEnoughFoods     = noFoodPref     || selectedFoods.length >= 10;
+  const hasEnoughExercises = noExercisePref || selectedExercises.length >= 5;
+  const hasEnoughMentality = noMentalityPref || selectedMentality.length >= 3;
+  const progressPct        = (step / TOTAL_STEPS) * 100;
+
+  const slideProps = {
+    initial:    { opacity: 0, x: 40 },
+    animate:    { opacity: 1, x: 0 },
+    exit:       { opacity: 0, x: -40 },
+    transition: { type: 'spring' as const, stiffness: 280, damping: 28 },
   };
 
-  const categoryNames = {
-    fruit: '🍎 Fruits (15-20%)',
-    vegetable: '🥦 Vegetables (30-35%)',
-    grain: '🌾 Grains (25%)',
-    protein: '🍗 Proteins (25%)',
-    'healthy-fat': '🥑 Healthy Fats',
-  };
-
-  // Validation
-  const hasEnoughFoods = selectedFoods.length >= 10;
+  const NoPrefToggle = ({ active, onToggle, label, activeLabel }: {
+    active: boolean; onToggle: () => void; label: string; activeLabel: string;
+  }) => (
+    <motion.button
+      onClick={onToggle}
+      className="w-full mb-3 py-3 rounded-2xl text-sm font-black flex items-center justify-center gap-2"
+      style={{
+        background: active ? '#22c55e' : '#f3f4f6',
+        color:      active ? 'white'   : '#6b7280',
+        boxShadow:  active ? '0 4px 0 0 #15803d' : '0 3px 0 0 #d1d5db',
+      }}
+      whileTap={{ scale: 0.97, y: 2, boxShadow: 'none' }}
+      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+    >
+      <motion.span
+        animate={{ rotate: active ? 360 : 0 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      >
+        🎲
+      </motion.span>
+      {active ? activeLabel : label}
+      {active && <Check className="w-4 h-4" />}
+    </motion.button>
+  );
 
   return (
-    <div className="min-h-screen p-4 flex flex-col">
-      {/* Header */}
-      <div className="text-center mb-8 mt-8">
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <div className="text-6xl">💪</div>
-          <div className="flex flex-col items-center">
-            <img 
-              src="/qr-code.png" 
-              alt="Scan to demo (AI features may be rate limited)" 
-              className="w-20 h-20 rounded-lg border-2 border-gray-200"
-            />
-            <p className="text-xs text-gray-500 mt-1">Scan to demo<br></br> (AI features may be rate limited)</p>
-          </div>
+    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(160deg, #f0fdf4 0%, #eff6ff 100%)' }}>
+
+      {/* Progress bar */}
+      <div className="px-4 pt-10 pb-0">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs font-bold text-gray-500">Step {step} of {TOTAL_STEPS}</span>
+          <span className="text-xs font-bold text-dem-green-600">{STEP_NAMES[step - 1]}</span>
         </div>
-        <h1 className="text-4xl font-bold text-dem-green-600 mb-2">Dem</h1>
-        <p className="text-gray-600">Diet · Exercise · Mentality</p>
+        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+          <motion.div
+            className="h-full rounded-full bg-dem-green-500"
+            animate={{ width: `${progressPct}%` }}
+            transition={{ type: 'spring', stiffness: 200, damping: 26 }}
+          />
+        </div>
       </div>
 
-      {/* Step 1: Welcome */}
-      {step === 1 && (
-        <div className="flex-1 flex flex-col justify-between">
-          {/* Mascot introduction */}
-          <div className="flex justify-center mb-6">
-            <Mascot 
-              message="Hi! My name is Dem and I'll be your guide! 👋" 
-              mood="excited"
-              persistent={true}
-            />
-          </div>
-          
-          <Card className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">
-              Welcome! 👋
-            </h2>
-            <p className="text-gray-600 mb-4">
-              Let's start your health journey with a simple 3-day plan. 
-              Small commitments lead to big changes.
-            </p>
-            <p className="text-gray-600">
-              What should we call you?
-            </p>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name (optional)"
-              className="w-full mt-4 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-dem-green-400 focus:outline-none"
-            />
-          </Card>
+      <AnimatePresence mode="wait">
 
-          <Button onClick={() => setStep(2)} className="w-full">
-            Continue
-          </Button>
-        </div>
-      )}
-
-      {/* Step 2: Food Selection */}
-      {step === 2 && (
-        <div className="flex-1 flex flex-col">
-          {/* Sticky pie chart at top */}
-          <div className="sticky top-0 z-10 bg-gradient-to-br from-dem-green-50 to-dem-blue-50 pb-4 -mt-4 pt-4">
-            <FoodPieChart selectedFoodIds={selectedFoods} />
-          </div>
-
-          <div className="mb-4 flex items-center justify-center gap-4">
-            <Mascot 
-              message="Pick foods you love! We'll build your meals from these 🍎" 
-              mood="happy"
-            />
-          </div>
-
-          <Card className="mb-4">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Pick Foods You Like
-            </h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Select at least 10 foods. The more variety, the better!
-            </p>
-            <div className="text-sm font-semibold text-dem-green-600">
-              {selectedFoods.length} selected {hasEnoughFoods && '✓'}
+        {/* ── Step 1: Goal selection ── */}
+        {step === 1 && (
+          <motion.div key="step1" {...slideProps} className="flex-1 flex flex-col p-4 pt-6">
+            <div className="flex justify-center mb-4">
+              <Mascot
+                message={`Nice to meet you, ${displayName}! What are you here to work on? 🎯`}
+                mood="happy"
+                persistent
+                currentEnergy="high"
+                size={100}
+              />
             </div>
-          </Card>
-
-          {/* Food Categories */}
-          <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-            {Object.entries(foodsByCategory).map(([category, foods]) => (
-              <Card key={category}>
-                <h3 className="font-bold text-gray-700 mb-3">
-                  {categoryNames[category as keyof typeof categoryNames]}
-                </h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {foods.map(food => {
-                    const isSelected = selectedFoods.includes(food.id);
-                    return (
-                      <button
-                        key={food.id}
-                        onClick={() => toggleFood(food.id)}
-                        className={`
-                          tap-target px-4 py-3 rounded-xl border-2 transition-all text-left
-                          ${isSelected 
-                            ? 'border-dem-green-500 bg-dem-green-50' 
-                            : 'border-gray-200 bg-white hover:border-dem-green-300'
-                          }
-                        `}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span>
-                            <span className="text-xl mr-2">{food.emoji}</span>
-                            <span className="text-sm font-medium">{food.name}</span>
-                          </span>
-                          {isSelected && (
-                            <Check className="w-5 h-5 text-dem-green-600" />
-                          )}
+            <Card className="mb-4">
+              <h1 className="text-3xl font-black text-gray-900 mb-1">
+                Welcome to <span className="text-dem-green-500">Dem</span>!
+              </h1>
+              <p className="text-gray-500 text-sm mb-4 leading-relaxed">
+                Diet · Exercise · Mentality. Select your goals — we'll tailor your plan around what matters most.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {GOAL_OPTIONS.map(goal => {
+                  const isSelected = selectedGoals.includes(goal.id);
+                  return (
+                    <motion.button
+                      key={goal.id}
+                      onClick={() => toggleGoal(goal.id)}
+                      className="relative px-3 py-3 rounded-xl border-2 text-left"
+                      style={{
+                        borderColor: isSelected ? '#22c55e' : '#e5e7eb',
+                        background:  isSelected ? '#f0fdf4' : 'white',
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    >
+                      <div className="flex items-center justify-between gap-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-lg flex-shrink-0">{goal.emoji}</span>
+                          <span className="text-xs font-semibold text-gray-800 leading-tight">{goal.label}</span>
                         </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </Card>
-            ))}
-          </div>
+                        <AnimatePresence>
+                          {isSelected && (
+                            <motion.div
+                              initial={{ scale: 0, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0, opacity: 0 }}
+                              transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                              className="flex-shrink-0"
+                            >
+                              <Check className="w-4 h-4 text-dem-green-600" />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </Card>
+            <Button onClick={() => setStep(2)} className="w-full text-lg">
+              {selectedGoals.length > 0
+                ? `${selectedGoals.length} goal${selectedGoals.length > 1 ? 's' : ''} set, Next →`
+                : "Next →"}
+            </Button>
+          </motion.div>
+        )}
 
-          <div className="flex gap-3">
-            <Button 
-              variant="secondary" 
-              onClick={() => setStep(1)}
-              className="flex-1"
-            >
-              Back
-            </Button>
-            <Button 
-              onClick={handleComplete}
-              disabled={!hasEnoughFoods}
-              className="flex-1"
-            >
-              Create My Plan
-            </Button>
-          </div>
-        </div>
-      )}
+        {/* ── Step 2: Food selection ── */}
+        {step === 2 && (
+          <motion.div key="step2" {...slideProps} className="flex-1 flex flex-col">
+            <div className="sticky top-0 z-10 px-4 pt-4 pb-3" style={{ background: 'linear-gradient(160deg, #f0fdf4 0%, #eff6ff 100%)' }}>
+              <NoPrefToggle
+                active={noFoodPref}
+                onToggle={() => setNoFoodPref(v => !v)}
+                label="No preference (skip selection)"
+                activeLabel="No preference, surprise me!"
+              />
+              <AnimatePresence>
+                {!noFoodPref && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <FoodPieChart selectedFoodIds={selectedFoods} />
+                    <div className="flex items-center justify-between mt-2">
+                      <div>
+                        <h2 className="text-xl font-black text-gray-900">Pick Your Foods</h2>
+                        <p className="text-xs text-gray-500">Select at least 10. We'll build your meals from these.</p>
+                      </div>
+                      <motion.div
+                        className="px-3 py-1.5 rounded-full text-sm font-black"
+                        animate={{
+                          background: hasEnoughFoods ? '#22c55e' : '#f3f4f6',
+                          color:      hasEnoughFoods ? 'white'   : '#6b7280',
+                        }}
+                      >
+                        {selectedFoods.length} / 10+
+                      </motion.div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <AnimatePresence>
+                {noFoodPref && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="rounded-2xl p-3 text-center" style={{ background: '#f0fdf4', border: '2px solid #86efac' }}>
+                      <p className="text-sm font-bold text-green-700">We'll rotate from our full food library every day 🌈</p>
+                      <p className="text-xs text-green-600 mt-0.5">You can still pick foods below to mix it in.</p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
+              {(Object.entries(foodsByCategory) as [keyof typeof FOOD_CATEGORIES, typeof FOODS][]).map(([category, foods]) => (
+                <Card key={category}>
+                  <h3 className="font-black text-gray-800 mb-3 text-base">{FOOD_CATEGORIES[category]}</h3>
+                  <SelectionGrid
+                    items={foods.map(f => ({ id: f.id, emoji: f.emoji, name: f.name }))}
+                    selected={selectedFoods}
+                    onToggle={toggle(setSelectedFoods)}
+                  />
+                </Card>
+              ))}
+            </div>
+            <div className="p-4 pt-2 flex gap-3" style={{ background: 'linear-gradient(to top, #f0fdf4 70%, transparent)' }}>
+              <Button variant="secondary" onClick={() => setStep(1)} className="flex-none px-5">←</Button>
+              <Button onClick={() => setStep(3)} disabled={!hasEnoughFoods} className="flex-1 text-base">
+                {hasEnoughFoods ? 'Next →' : `Select ${Math.max(0, 10 - selectedFoods.length)} more`}
+              </Button>
+            </div>
+            <FloatingMascot
+              energy="high"
+              userName={displayName}
+              firstVisitMessage={`Hey ${displayName}! Pick at least 10 foods you like, or tap "No preference" to skip!`}
+            />
+          </motion.div>
+        )}
+
+        {/* ── Step 3: Exercise selection ── */}
+        {step === 3 && (
+          <motion.div key="step3" {...slideProps} className="flex-1 flex flex-col">
+            <div className="sticky top-0 z-10 px-4 pt-4 pb-3" style={{ background: 'linear-gradient(160deg, #f0fdf4 0%, #eff6ff 100%)' }}>
+              <NoPrefToggle
+                active={noExercisePref}
+                onToggle={() => setNoExercisePref(v => !v)}
+                label="No preference (use all exercises)"
+                activeLabel="No preference, mix it up!"
+              />
+              <AnimatePresence>
+                {!noExercisePref && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-xl font-black text-gray-900">Pick Your Exercises</h2>
+                        <p className="text-xs text-gray-500">Select at least 5. Your daily workouts pull from these.</p>
+                      </div>
+                      <motion.div
+                        className="px-3 py-1.5 rounded-full text-sm font-black"
+                        animate={{
+                          background: hasEnoughExercises ? '#22c55e' : '#f3f4f6',
+                          color:      hasEnoughExercises ? 'white'   : '#6b7280',
+                        }}
+                      >
+                        {selectedExercises.length} / 5+
+                      </motion.div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
+              {(Object.entries(exercisesByGroup) as [keyof typeof EXERCISE_GROUPS, typeof EXERCISES][]).map(([group, exercises]) => (
+                <Card key={group}>
+                  <h3 className="font-black text-gray-800 mb-3 text-base">{EXERCISE_GROUPS[group]}</h3>
+                  <SelectionGrid
+                    items={exercises.map(e => ({ id: e.id, emoji: e.emoji, name: e.name }))}
+                    selected={selectedExercises}
+                    onToggle={toggle(setSelectedExercises)}
+                  />
+                </Card>
+              ))}
+            </div>
+            <div className="p-4 pt-2 flex gap-3" style={{ background: 'linear-gradient(to top, #f0fdf4 70%, transparent)' }}>
+              <Button variant="secondary" onClick={() => setStep(2)} className="flex-none px-5">←</Button>
+              <Button onClick={() => setStep(4)} disabled={!hasEnoughExercises} className="flex-1 text-base">
+                {hasEnoughExercises ? 'Next →' : `Select ${Math.max(0, 5 - selectedExercises.length)} more`}
+              </Button>
+            </div>
+            <FloatingMascot
+              energy="high"
+              userName={displayName}
+              firstVisitMessage={`Nice, ${displayName}! Pick at least 5 exercises you enjoy. Your workouts will pull from these.`}
+            />
+          </motion.div>
+        )}
+
+        {/* ── Step 4: Mentality selection ── */}
+        {step === 4 && (
+          <motion.div key="step4" {...slideProps} className="flex-1 flex flex-col">
+            <div className="sticky top-0 z-10 px-4 pt-4 pb-3" style={{ background: 'linear-gradient(160deg, #f0fdf4 0%, #eff6ff 100%)' }}>
+              <NoPrefToggle
+                active={noMentalityPref}
+                onToggle={() => setNoMentalityPref(v => !v)}
+                label="No preference (use all check-ins)"
+                activeLabel="No preference, surprise me!"
+              />
+              <AnimatePresence>
+                {!noMentalityPref && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-xl font-black text-gray-900">Your Mind Check-ins</h2>
+                        <p className="text-xs text-gray-500">Select at least 3. Mental health is the third pillar.</p>
+                      </div>
+                      <motion.div
+                        className="px-3 py-1.5 rounded-full text-sm font-black"
+                        animate={{
+                          background: hasEnoughMentality ? '#7c3aed' : '#f3f4f6',
+                          color:      hasEnoughMentality ? 'white'   : '#6b7280',
+                        }}
+                      >
+                        {selectedMentality.length} / 3+
+                      </motion.div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
+              {(Object.entries(mentalityByPillar) as [keyof typeof MENTALITY_PILLARS, typeof MENTALITY_CHECKS][]).map(([pillar, checks]) => (
+                <Card key={pillar}>
+                  <h3 className="font-black text-gray-800 mb-3 text-base">{MENTALITY_PILLARS[pillar]}</h3>
+                  <SelectionGrid
+                    items={checks.map(m => ({ id: m.id, emoji: m.emoji, name: m.title }))}
+                    selected={selectedMentality}
+                    onToggle={toggle(setSelectedMentality)}
+                  />
+                </Card>
+              ))}
+            </div>
+            <div className="p-4 pt-2 flex gap-3" style={{ background: 'linear-gradient(to top, #f0fdf4 70%, transparent)' }}>
+              <Button variant="secondary" onClick={() => setStep(3)} className="flex-none px-5">←</Button>
+              <Button onClick={handleComplete} disabled={!hasEnoughMentality} className="flex-1 text-base">
+                {hasEnoughMentality ? 'Create My Plan →' : `Select ${Math.max(0, 3 - selectedMentality.length)} more`}
+              </Button>
+            </div>
+            <FloatingMascot
+              energy="high"
+              userName={displayName}
+              firstVisitMessage="Almost there! Pick at least 3 mental check-ins. They keep your mind as healthy as your body."
+            />
+          </motion.div>
+        )}
+
+      </AnimatePresence>
     </div>
   );
 }

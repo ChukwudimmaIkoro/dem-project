@@ -18,18 +18,6 @@ export default function RootLayout({
         <meta name="theme-color" content="#22c55e" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              // Suppress browser extension errors
-              window.addEventListener('unhandledrejection', function(event) {
-                if (event.reason?.message?.includes('message channel closed')) {
-                  event.preventDefault();
-                }
-              });
-            `,
-          }}
-        />
       </head>
       <body className="max-w-md mx-auto">
         {children}
