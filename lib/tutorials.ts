@@ -23,4 +23,9 @@ export const TUTORIALS: Record<string, TutorialSlide[]> = {
     { message: "Track your streak and get an AI health insight summary here." },
     { message: "Complete all three pillars each day to grow your streak!" },
   ],
+  streakComplete: [
+    { message: "You finished your streak! That's a huge deal." },
+    { message: "Ready to level up? Head to the Progress tab and set a longer streak goal. Try for 5, 7, 14, or even 30 days!" },
+    { message: "The longer the streak, the deeper the habit. You've got this!" },
+  ],
 };

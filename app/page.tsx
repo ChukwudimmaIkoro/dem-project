@@ -1,43 +1,102 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { AppState } from '@/types';
-import { loadAppState } from '@/lib/storage';
+import { useEffect, useState, useCallback } from 'react';
+import type { User } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
+import { loadAppState, saveUserProfile, saveCurrentPlan, clearAppState } from '@/lib/storage';
+import { loadUserProfile, loadActivePlan } from '@/lib/supabaseStorage';
+import { restoreTutorialsSeen } from '@/hooks/useTutorial';
+import AuthScreen from '@/components/AuthScreen';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import PlanView from '@/components/PlanView';
 
-export default function Home() {
-  const [appState, setAppState] = useState<AppState | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+type Screen = 'loading' | 'auth' | 'onboarding' | 'app';
 
-  useEffect(() => {
-    // Load state from localStorage
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(160deg, #f0fdf4 0%, #eff6ff 100%)' }}>
+      <div className="text-center">
+        <div className="text-6xl mb-4">💪</div>
+        <h1 className="text-3xl font-black text-dem-green-600">Dem</h1>
+        <p className="text-gray-500 mt-2 text-sm">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function Home() {
+  const [screen,   setScreen]   = useState<Screen>('loading');
+  const [authUser, setAuthUser] = useState<User | null>(null);
+
+  // Pull cloud data into localStorage, then decide which screen to show.
+  // Called on every successful auth (sign-in, sign-up, session restore).
+  const bootstrap = useCallback(async (user: User) => {
+    setAuthUser(user);
+
+    // Restore cloud data → localStorage so the app always starts from the latest synced state
+    const [cloudUser, cloudPlan] = await Promise.all([
+      loadUserProfile(),
+      loadActivePlan(),
+      restoreTutorialsSeen(),
+    ]);
+    if (cloudUser) saveUserProfile(cloudUser);
+    if (cloudPlan) saveCurrentPlan(cloudPlan);
+
     const state = loadAppState();
-    setAppState(state);
-    setIsLoading(false);
+    const hasApp = state.hasCompletedOnboarding && !!state.currentPlan;
+    setScreen(hasApp ? 'app' : 'onboarding');
   }, []);
 
-  // Show loading state
-  if (isLoading || !appState) {
+  useEffect(() => {
+    // Check existing session on mount
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        bootstrap(data.user);
+      } else {
+        setScreen('auth');
+      }
+    });
+
+    // Only handle explicit sign-in / sign-out events — not INITIAL_SESSION
+    // (getUser() above already handles the session-restore case)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        bootstrap(session.user);
+      } else if (event === 'SIGNED_OUT') {
+        clearAppState();
+        setAuthUser(null);
+        setScreen('auth');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [bootstrap]);
+
+  if (screen === 'loading') return <LoadingScreen />;
+
+  if (screen === 'auth') {
+    return <AuthScreen onAuth={user => bootstrap(user)} />;
+  }
+
+  if (screen === 'onboarding') {
+    const userName = authUser?.user_metadata?.name || '';
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4">💪</div>
-          <h1 className="text-3xl font-bold text-dem-green-600">Dem</h1>
-          <p className="text-gray-600 mt-2">Loading...</p>
-        </div>
-      </div>
+      <OnboardingFlow
+        userName={userName}
+        onComplete={() => setScreen('app')}
+      />
     );
   }
 
-  // Route to appropriate view
-  if (!appState.hasCompletedOnboarding || !appState.user) {
-    return <OnboardingFlow onComplete={() => setAppState(loadAppState())} />;
-  }
-
-  if (!appState.currentPlan) {
-    return <OnboardingFlow onComplete={() => setAppState(loadAppState())} />;
-  }
-
-  return <PlanView onReset={() => setAppState(loadAppState())} />;
+  return (
+    <PlanView
+      onReset={() => setScreen('onboarding')}
+      onSignOut={async () => {
+        await supabase.auth.signOut();
+        // onAuthStateChange fires and handles clearAppState + screen reset
+      }}
+      authUserEmail={authUser?.email ?? ''}
+      authUserName={authUser?.user_metadata?.name ?? ''}
+    />
+  );
 }

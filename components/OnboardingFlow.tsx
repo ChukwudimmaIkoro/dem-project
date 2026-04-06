@@ -8,6 +8,7 @@ import { EXERCISES } from '@/lib/exercises';
 import { MENTALITY_CHECKS } from '@/lib/mentality';
 import { generateThreeDayPlan } from '@/lib/planGenerator';
 import { saveUserProfile, saveCurrentPlan } from '@/lib/storage';
+import { syncUserProfile, syncPlan } from '@/lib/supabaseStorage';
 import { Button } from './Button';
 import { Card } from './Card';
 import { Check } from 'lucide-react';
@@ -16,12 +17,13 @@ import Mascot from './Mascot';
 import FloatingMascot from './FloatingMascot';
 
 interface OnboardingFlowProps {
+  userName: string;   // from auth metadata — no name entry step needed
   onComplete: () => void;
 }
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 4;
 
-const STEP_NAMES = ['Welcome', 'Your Goals', 'Your Foods', 'Your Exercises', 'Your Mind'];
+const STEP_NAMES = ['Your Goals', 'Your Foods', 'Your Exercises', 'Your Mind'];
 
 const GOAL_OPTIONS = [
   { id: 'routine',  emoji: '🔄', label: 'Start & maintain a routine' },
@@ -57,17 +59,9 @@ const MENTALITY_PILLARS = {
 
 // ── Reusable selection grid ─────────────────────────────────────────────────
 
-interface SelectionItem {
-  id: string;
-  emoji: string;
-  name: string;
-}
+interface SelectionItem { id: string; emoji: string; name: string; }
 
-function SelectionGrid({
-  items,
-  selected,
-  onToggle,
-}: {
+function SelectionGrid({ items, selected, onToggle }: {
   items: SelectionItem[];
   selected: string[];
   onToggle: (id: string) => void;
@@ -116,10 +110,9 @@ function SelectionGrid({
 
 // ── Main component ──────────────────────────────────────────────────────────
 
-export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
+export default function OnboardingFlow({ userName, onComplete }: OnboardingFlowProps) {
   const [step,              setStep]              = useState(1);
   const [selectedGoals,     setSelectedGoals]     = useState<string[]>([]);
-  const [name,              setName]              = useState('');
   const [selectedFoods,     setSelectedFoods]     = useState<string[]>([]);
   const [noFoodPref,        setNoFoodPref]        = useState(false);
   const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
@@ -127,7 +120,9 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const [selectedMentality, setSelectedMentality] = useState<string[]>([]);
   const [noMentalityPref,   setNoMentalityPref]   = useState(false);
 
-  // Pre-group items for rendering
+  const displayName = userName.trim() || 'Friend';
+
+  // Pre-group items
   const foodsByCategory = {
     fruit:         FOODS.filter(f => f.category === 'fruit'),
     vegetable:     FOODS.filter(f => f.category === 'vegetable'),
@@ -135,7 +130,6 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     protein:       FOODS.filter(f => f.category === 'protein'),
     'healthy-fat': FOODS.filter(f => f.category === 'healthy-fat'),
   };
-
   const exercisesByGroup = {
     lower:  EXERCISES.filter(e => e.muscleGroup === 'lower'),
     upper:  EXERCISES.filter(e => e.muscleGroup === 'upper'),
@@ -143,7 +137,6 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     full:   EXERCISES.filter(e => e.muscleGroup === 'full'),
     cardio: EXERCISES.filter(e => e.muscleGroup === 'cardio'),
   };
-
   const mentalityByPillar = {
     mindfulness: MENTALITY_CHECKS.filter(m => m.pillar === 'mindfulness'),
     physical:    MENTALITY_CHECKS.filter(m => m.pillar === 'physical'),
@@ -154,38 +147,36 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   // Toggle helpers
   const toggleGoal = (goalId: string) => {
     if (goalId === 'all') {
-      setSelectedGoals(prev =>
-        prev.includes('all') ? [] : GOAL_OPTIONS.map(g => g.id)
-      );
+      setSelectedGoals(prev => prev.includes('all') ? [] : GOAL_OPTIONS.map(g => g.id));
     } else {
       setSelectedGoals(prev => {
         const without = prev.filter(id => id !== 'all');
-        return without.includes(goalId)
-          ? without.filter(id => id !== goalId)
-          : [...without, goalId];
+        return without.includes(goalId) ? without.filter(id => id !== goalId) : [...without, goalId];
       });
     }
   };
 
   const toggle = (setter: React.Dispatch<React.SetStateAction<string[]>>) =>
-    (id: string) => setter(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    (id: string) => setter(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const handleComplete = () => {
     const user: UserProfile = {
-      name:              name.trim() || 'Friend',
+      name:              displayName,
       goals:             selectedGoals,
-      selectedFoods:     noFoodPref      ? [] : selectedFoods,
-      selectedExercises: noExercisePref  ? [] : selectedExercises,
+      selectedFoods:     noFoodPref     ? [] : selectedFoods,
+      selectedExercises: noExercisePref ? [] : selectedExercises,
       selectedMentality: noMentalityPref ? [] : selectedMentality,
       noFoodPreference:      noFoodPref,
       noExercisePreference:  noExercisePref,
       noMentalityPreference: noMentalityPref,
       createdAt: new Date().toISOString(),
     };
+    const plan = generateThreeDayPlan(user);
     saveUserProfile(user);
-    saveCurrentPlan(generateThreeDayPlan(user));
+    saveCurrentPlan(plan);
+    // Sync to Supabase immediately (fire and forget)
+    syncUserProfile(user).catch(() => {});
+    syncPlan(plan).catch(() => {});
     onComplete();
   };
 
@@ -194,7 +185,6 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const hasEnoughMentality = noMentalityPref || selectedMentality.length >= 3;
   const progressPct        = (step / TOTAL_STEPS) * 100;
 
-  // ── Shared slide animation ──────────────────────────────────────────────────
   const slideProps = {
     initial:    { opacity: 0, x: 40 },
     animate:    { opacity: 1, x: 0 },
@@ -202,10 +192,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     transition: { type: 'spring' as const, stiffness: 280, damping: 28 },
   };
 
-  // ── No-preference toggle button ────────────────────────────────────────────
-  const NoPrefToggle = ({
-    active, onToggle, label, activeLabel,
-  }: {
+  const NoPrefToggle = ({ active, onToggle, label, activeLabel }: {
     active: boolean; onToggle: () => void; label: string; activeLabel: string;
   }) => (
     <motion.button
@@ -236,12 +223,8 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       {/* Progress bar */}
       <div className="px-4 pt-10 pb-0">
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs font-bold text-gray-500">
-            Step {step} of {TOTAL_STEPS}
-          </span>
-          <span className="text-xs font-bold text-dem-green-600">
-            {STEP_NAMES[step - 1]}
-          </span>
+          <span className="text-xs font-bold text-gray-500">Step {step} of {TOTAL_STEPS}</span>
+          <span className="text-xs font-bold text-dem-green-600">{STEP_NAMES[step - 1]}</span>
         </div>
         <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
           <motion.div
@@ -254,64 +237,24 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
 
       <AnimatePresence mode="wait">
 
-        {/* ── Step 1: Welcome / Name ── */}
+        {/* ── Step 1: Goal selection ── */}
         {step === 1 && (
           <motion.div key="step1" {...slideProps} className="flex-1 flex flex-col p-4 pt-6">
             <div className="flex justify-center mb-4">
               <Mascot
-                message="Hi! I'm Dem, your health companion! 👋"
-                mood="excited"
-                persistent={true}
-                currentEnergy="high"
-                size={100}
-              />
-            </div>
-
-            <Card className="mb-4">
-              <h1 className="text-3xl font-black text-gray-900 mb-1">
-                Welcome to <span className="text-dem-green-500">Dem</span>
-              </h1>
-              <p className="text-gray-500 text-sm mb-5 leading-relaxed">
-                Diet · Exercise · Mentality. Your 3-day adaptive health plan starts here.
-              </p>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                What should we call you?
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && setStep(2)}
-                placeholder="Your name (optional)"
-                className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-2xl text-base
-                           focus:border-dem-green-400 focus:outline-none transition-colors
-                           placeholder:text-gray-400 font-medium"
-              />
-            </Card>
-
-            <Button onClick={() => setStep(2)} className="w-full text-lg">Let's go! →</Button>
-          </motion.div>
-        )}
-
-        {/* ── Step 2: Goal selection ── */}
-        {step === 2 && (
-          <motion.div key="step2" {...slideProps} className="flex-1 flex flex-col p-4 pt-6">
-            <div className="flex justify-center mb-4">
-              <Mascot
-                message={`${name.trim() ? `Nice to meet you, ${name.trim()}! ` : ''}What are you here to work on? 🎯`}
+                message={`Nice to meet you, ${displayName}! What are you here to work on? 🎯`}
                 mood="happy"
-                persistent={true}
+                persistent
                 currentEnergy="high"
                 size={100}
               />
             </div>
-
             <Card className="mb-4">
               <h1 className="text-3xl font-black text-gray-900 mb-1">
-                What brings you to <span className="text-dem-green-500">Dem</span>?
+                Welcome to <span className="text-dem-green-500">Dem</span>!
               </h1>
               <p className="text-gray-500 text-sm mb-4 leading-relaxed">
-                Select all that apply. We'll tailor your plan around what matters most.
+                Diet · Exercise · Mentality. Select your goals — we'll tailor your plan around what matters most.
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {GOAL_OPTIONS.map(goal => {
@@ -352,21 +295,17 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 })}
               </div>
             </Card>
-
-            <div className="flex gap-3">
-              <Button variant="secondary" onClick={() => setStep(1)} className="flex-none px-5">←</Button>
-              <Button onClick={() => setStep(3)} className="flex-1 text-lg">
-                {selectedGoals.length > 0
-                  ? `${selectedGoals.length} goal${selectedGoals.length > 1 ? 's' : ''} set, Next →`
-                  : 'Next →'}
-              </Button>
-            </div>
+            <Button onClick={() => setStep(2)} className="w-full text-lg">
+              {selectedGoals.length > 0
+                ? `${selectedGoals.length} goal${selectedGoals.length > 1 ? 's' : ''} set, Next →`
+                : "Next →"}
+            </Button>
           </motion.div>
         )}
 
-        {/* ── Step 3: Food selection ── */}
-        {step === 3 && (
-          <motion.div key="step3" {...slideProps} className="flex-1 flex flex-col">
+        {/* ── Step 2: Food selection ── */}
+        {step === 2 && (
+          <motion.div key="step2" {...slideProps} className="flex-1 flex flex-col">
             <div className="sticky top-0 z-10 px-4 pt-4 pb-3" style={{ background: 'linear-gradient(160deg, #f0fdf4 0%, #eff6ff 100%)' }}>
               <NoPrefToggle
                 active={noFoodPref}
@@ -419,7 +358,6 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 )}
               </AnimatePresence>
             </div>
-
             <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
               {(Object.entries(foodsByCategory) as [keyof typeof FOOD_CATEGORIES, typeof FOODS][]).map(([category, foods]) => (
                 <Card key={category}>
@@ -432,25 +370,23 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 </Card>
               ))}
             </div>
-
             <div className="p-4 pt-2 flex gap-3" style={{ background: 'linear-gradient(to top, #f0fdf4 70%, transparent)' }}>
-              <Button variant="secondary" onClick={() => setStep(2)} className="flex-none px-5">←</Button>
-              <Button onClick={() => setStep(4)} disabled={!hasEnoughFoods} className="flex-1 text-base">
+              <Button variant="secondary" onClick={() => setStep(1)} className="flex-none px-5">←</Button>
+              <Button onClick={() => setStep(3)} disabled={!hasEnoughFoods} className="flex-1 text-base">
                 {hasEnoughFoods ? 'Next →' : `Select ${Math.max(0, 10 - selectedFoods.length)} more`}
               </Button>
             </div>
-
             <FloatingMascot
               energy="high"
-              userName={name.trim() || undefined}
-              firstVisitMessage={`${name.trim() ? `Hey ${name.trim()}! ` : 'Hey! '}Pick at least 10 foods you like, or tap "No preference" to skip!`}
+              userName={displayName}
+              firstVisitMessage={`Hey ${displayName}! Pick at least 10 foods you like, or tap "No preference" to skip!`}
             />
           </motion.div>
         )}
 
-        {/* ── Step 4: Exercise selection ── */}
-        {step === 4 && (
-          <motion.div key="step4" {...slideProps} className="flex-1 flex flex-col">
+        {/* ── Step 3: Exercise selection ── */}
+        {step === 3 && (
+          <motion.div key="step3" {...slideProps} className="flex-1 flex flex-col">
             <div className="sticky top-0 z-10 px-4 pt-4 pb-3" style={{ background: 'linear-gradient(160deg, #f0fdf4 0%, #eff6ff 100%)' }}>
               <NoPrefToggle
                 active={noExercisePref}
@@ -486,7 +422,6 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 )}
               </AnimatePresence>
             </div>
-
             <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
               {(Object.entries(exercisesByGroup) as [keyof typeof EXERCISE_GROUPS, typeof EXERCISES][]).map(([group, exercises]) => (
                 <Card key={group}>
@@ -499,25 +434,23 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 </Card>
               ))}
             </div>
-
             <div className="p-4 pt-2 flex gap-3" style={{ background: 'linear-gradient(to top, #f0fdf4 70%, transparent)' }}>
-              <Button variant="secondary" onClick={() => setStep(3)} className="flex-none px-5">←</Button>
-              <Button onClick={() => setStep(5)} disabled={!hasEnoughExercises} className="flex-1 text-base">
+              <Button variant="secondary" onClick={() => setStep(2)} className="flex-none px-5">←</Button>
+              <Button onClick={() => setStep(4)} disabled={!hasEnoughExercises} className="flex-1 text-base">
                 {hasEnoughExercises ? 'Next →' : `Select ${Math.max(0, 5 - selectedExercises.length)} more`}
               </Button>
             </div>
-
             <FloatingMascot
               energy="high"
-              userName={name.trim() || undefined}
-              firstVisitMessage={`${name.trim() ? `Nice, ${name.trim()}! ` : 'Nice! '}Pick at least 5 exercises you enjoy. Your workouts will pull from these.`}
+              userName={displayName}
+              firstVisitMessage={`Nice, ${displayName}! Pick at least 5 exercises you enjoy. Your workouts will pull from these.`}
             />
           </motion.div>
         )}
 
-        {/* ── Step 5: Mentality selection ── */}
-        {step === 5 && (
-          <motion.div key="step5" {...slideProps} className="flex-1 flex flex-col">
+        {/* ── Step 4: Mentality selection ── */}
+        {step === 4 && (
+          <motion.div key="step4" {...slideProps} className="flex-1 flex flex-col">
             <div className="sticky top-0 z-10 px-4 pt-4 pb-3" style={{ background: 'linear-gradient(160deg, #f0fdf4 0%, #eff6ff 100%)' }}>
               <NoPrefToggle
                 active={noMentalityPref}
@@ -553,7 +486,6 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 )}
               </AnimatePresence>
             </div>
-
             <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
               {(Object.entries(mentalityByPillar) as [keyof typeof MENTALITY_PILLARS, typeof MENTALITY_CHECKS][]).map(([pillar, checks]) => (
                 <Card key={pillar}>
@@ -566,17 +498,15 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 </Card>
               ))}
             </div>
-
             <div className="p-4 pt-2 flex gap-3" style={{ background: 'linear-gradient(to top, #f0fdf4 70%, transparent)' }}>
-              <Button variant="secondary" onClick={() => setStep(4)} className="flex-none px-5">←</Button>
+              <Button variant="secondary" onClick={() => setStep(3)} className="flex-none px-5">←</Button>
               <Button onClick={handleComplete} disabled={!hasEnoughMentality} className="flex-1 text-base">
                 {hasEnoughMentality ? 'Create My Plan →' : `Select ${Math.max(0, 3 - selectedMentality.length)} more`}
               </Button>
             </div>
-
             <FloatingMascot
               energy="high"
-              userName={name.trim() || undefined}
+              userName={displayName}
               firstVisitMessage="Almost there! Pick at least 3 mental check-ins. They keep your mind as healthy as your body."
             />
           </motion.div>
