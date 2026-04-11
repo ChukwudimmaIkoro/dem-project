@@ -42,7 +42,7 @@ export default function Home() {
     if (cloudUser) saveUserProfile(cloudUser);
     if (cloudPlan) saveCurrentPlan(cloudPlan);
 
-    // Cloud plan is the authoritative source — don't let stale localStorage skip onboarding
+    // Cloud plan is authoritative — don't let stale localStorage skip onboarding for new users
     setScreen(cloudPlan ? 'app' : 'onboarding');
   }, []);
 
