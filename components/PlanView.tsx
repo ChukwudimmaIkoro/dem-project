@@ -109,8 +109,6 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const [lastPillar,      setLastPillar]      = useState<'diet' | 'exercise' | 'mentality'>('diet');
   const [userName,        setUserName]        = useState('');
   const [userFoods,       setUserFoods]       = useState<string[]>([]);
-  const [showDayWarning,  setShowDayWarning]  = useState(false);
-  const [pendingDayIdx,   setPendingDayIdx]   = useState<number | null>(null);
   // Energy transition overlay
   const [showEnergyTransition, setShowEnergyTransition] = useState(false);
   const [transitionEnergy,     setTransitionEnergy]     = useState<EnergyLevel>('medium');
@@ -286,20 +284,13 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   };
 
   const handleDayChange = (dayIdx: number) => {
-    // Block navigation to days that haven't started yet (dev panel is the way to advance in dev)
+    // Only allow navigation to past days and the current active day — never future
     if (dayIdx > getActiveDayIndex(plan)) return;
-    if (dayIdx > currentDayIndex && !isDayComplete(plan.days[currentDayIndex])) {
-      setPendingDayIdx(dayIdx);
-      setShowDayWarning(true);
-      return;
-    }
     commitDayChange(dayIdx);
   };
 
   const commitDayChange = (dayIdx: number) => {
     setCurrentDayIndex(dayIdx);
-    setShowDayWarning(false);
-    setPendingDayIdx(null);
     const dayNumber = plan.days[dayIdx].dayNumber;
     // Only show energy modal for the current active day, not past days
     const isActiveDayOrLater = dayIdx >= getActiveDayIndex(plan);
@@ -682,53 +673,6 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
         onSelect={handleEnergySelect}
         dayNumber={currentDay.dayNumber}
       />
-
-      {/* Incomplete day warning */}
-      <AnimatePresence>
-        {showDayWarning && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ background: 'rgba(0,0,0,0.55)' }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl"
-              initial={{ scale: 0.85, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 340, damping: 26 }}
-            >
-              <div className="text-center mb-5">
-                <div className="text-5xl mb-3">⚠️</div>
-                <h3 className="text-lg font-black text-gray-900 mb-1">
-                  Day {currentDay.dayNumber} isn't done yet!
-                </h3>
-                <p className="text-gray-500 text-sm">
-                  You haven't completed all tasks. Move on anyway?
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <Button
-                  variant="secondary"
-                  onClick={() => { setShowDayWarning(false); setPendingDayIdx(null); }}
-                  className="flex-1"
-                >
-                  Stay here
-                </Button>
-                <Button
-                  onClick={() => pendingDayIdx !== null && commitDayChange(pendingDayIdx)}
-                  className="flex-1"
-                  energyColor={theme.accent}
-                >
-                  Move on
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <div className="min-h-screen pb-24 px-4">
         {/* Header */}
