@@ -123,8 +123,8 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   // Preferences editing
   const [editingPrefs, setEditingPrefs] = useState<'diet' | 'exercise' | 'mentality' | null>(null);
 
-  // Dev panel — visible by default in DEV_MODE; toggle with Konami to hide/show
-  const [devUnlocked,  setDevUnlocked]  = useState(true);
+  // Dev panel — visible by default in DEV_MODE, hidden in prod; Konami toggles it
+  const [devUnlocked,  setDevUnlocked]  = useState(DEV_MODE);
   const konamiProgress = useRef(0);
 
   // Tutorials — one per context
@@ -157,9 +157,8 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       }
     }
 
-    // Konami code listener — only active in DEV_MODE (local builds)
+    // Konami code listener — active everywhere (hidden behind the sequence)
     const handleKonami = (e: KeyboardEvent) => {
-      if (!DEV_MODE) return;
       const seq = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
       if (e.key === seq[konamiProgress.current]) {
         konamiProgress.current += 1;
@@ -219,15 +218,19 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
 
   if (!plan) return <div className="p-4 text-center text-gray-400 pt-20">Loading...</div>;
 
-  const currentDay = plan.days[currentDayIndex];
-  const streak     = calculateStreak(plan);
-  const isComplete = isDayComplete(currentDay);
-  const theme      = ENERGY_THEME[currentDay.energyLevel];
+  const currentDay   = plan.days[currentDayIndex];
+  const streak       = calculateStreak(plan);
+  const isComplete   = isDayComplete(currentDay);
+  const theme        = ENERGY_THEME[currentDay.energyLevel];
+  const activeDayIdx = getActiveDayIndex(plan);
+  // Past days are view-only: user can navigate back but not interact
+  const isPastDay    = currentDayIndex < activeDayIdx;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleEnergySelect = (energy: EnergyLevel) => {
     setShowEnergyModal(false);
+    if (isPastDay) return;
     if (currentDay.energyLocked ?? false) return; // locked after day completion
 
     const state = loadAppState();
@@ -247,7 +250,8 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   };
 
   const toggleTask = (pillar: 'diet' | 'exercise' | 'mentality') => {
-    // Once a pillar is checked off it cannot be unchecked — protects streak integrity
+    // Past days and already-checked pillars are immutable
+    if (isPastDay) return;
     if (currentDay.completed[pillar]) return;
     const wasComplete = isComplete;
     updatePlan(p => {
@@ -297,7 +301,9 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     setShowDayWarning(false);
     setPendingDayIdx(null);
     const dayNumber = plan.days[dayIdx].dayNumber;
-    if (!hasShownEnergyModal(dayNumber) && !isDayComplete(plan.days[dayIdx])) {
+    // Only show energy modal for the current active day, not past days
+    const isActiveDayOrLater = dayIdx >= getActiveDayIndex(plan);
+    if (isActiveDayOrLater && !hasShownEnergyModal(dayNumber) && !isDayComplete(plan.days[dayIdx])) {
       setTimeout(() => setShowEnergyModal(true), 300);
     }
   };
@@ -761,12 +767,14 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
           onMouseLeave={dayNavDrag.onMouseLeave}
         >
           {plan.days.map((day, idx) => {
-            const done        = isDayComplete(day);
-            const isCurrent   = idx === currentDayIndex;
-            const activeDayIdx = getActiveDayIndex(plan);
-            const isFuture    = idx > activeDayIdx;
-            const dotColor    = ENERGY_CONFIG[day.energyLevel].color;
-            const numDays     = plan.days.length;
+            const done           = isDayComplete(day);
+            const isCurrent      = idx === currentDayIndex;
+            const isFuture       = idx > activeDayIdx;
+            const isPast         = idx < activeDayIdx;
+            // White dot = skipped past day (started but not completed)
+            const dotColor       = (!done && isPast) ? '#ffffff' : ENERGY_CONFIG[day.energyLevel].color;
+            const dotBorderColor = (!done && isPast) ? '#d1d5db' : 'white';
+            const numDays        = plan.days.length;
             return (
               <motion.button
                 key={idx}
@@ -801,11 +809,11 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 >
                   Day {idx + 1}
                 </span>
-                {/* Energy dot — hidden for future days */}
+                {/* Energy dot — hidden for future days; white for past skipped days */}
                 {!isFuture && (
                   <div
-                    className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white"
-                    style={{ background: dotColor }}
+                    className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2"
+                    style={{ background: dotColor, borderColor: dotBorderColor }}
                   />
                 )}
               </motion.button>
@@ -813,10 +821,43 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
           })}
         </div>
 
-        {/* Day complete banner */}
+        {/* Past day banner / Day complete banner */}
         <AnimatePresence>
-          {isComplete && (
+          {isPastDay && !isComplete && (
             <motion.div
+              key="past-day"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="rounded-3xl mb-4 overflow-hidden"
+              style={{ background: 'linear-gradient(135deg, #6b7280, #4b5563)' }}
+            >
+              <div className="p-4 text-center text-white">
+                <div className="text-3xl mb-1">📅</div>
+                <p className="font-black text-lg">Day {currentDay.dayNumber} Has Passed</p>
+                <p className="text-sm opacity-85">This day is view-only. Skipped days don't count toward your streak.</p>
+              </div>
+            </motion.div>
+          )}
+          {isPastDay && isComplete && (
+            <motion.div
+              key="past-complete"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="rounded-3xl mb-4 overflow-hidden"
+              style={{ background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentDark})` }}
+            >
+              <div className="p-4 text-center text-white">
+                <div className="text-3xl mb-1">✅</div>
+                <p className="font-black text-lg">Day {currentDay.dayNumber} — Completed!</p>
+                <p className="text-sm opacity-85">You crushed this day. View-only now.</p>
+              </div>
+            </motion.div>
+          )}
+          {!isPastDay && isComplete && (
+            <motion.div
+              key="complete"
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
@@ -835,10 +876,10 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
         {/* Mascot — clickable to open energy modal */}
         <motion.div
           className="flex justify-center mb-4 cursor-pointer"
-          onClick={() => { if (!(currentDay.energyLocked ?? false)) setShowEnergyModal(true); }}
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
-          title={(currentDay.energyLocked ?? false) ? 'Day complete, energy locked' : 'Tap to change energy level'}
+          onClick={() => { if (!isPastDay && !(currentDay.energyLocked ?? false)) setShowEnergyModal(true); }}
+          whileHover={{ scale: isPastDay ? 1 : 1.03 }}
+          whileTap={{ scale: isPastDay ? 1 : 0.97 }}
+          title={isPastDay ? 'Past day — view only' : (currentDay.energyLocked ?? false) ? 'Day complete, energy locked' : 'Tap to change energy level'}
         >
           <Mascot
             key={activePillar}
