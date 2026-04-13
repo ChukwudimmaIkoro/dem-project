@@ -68,20 +68,20 @@ export async function restoreTutorialsSeen(): Promise<void> {
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useTutorial(pageKey: string): { shouldShow: boolean; dismiss: () => void } {
-  const [shouldShow, setShouldShow] = useState(false);
-
-  useEffect(() => {
-    const seen = getSeenLocal();
-    if (!seen.has(pageKey)) setShouldShow(true);
-  }, [pageKey]);
+  // Lazy initializer reads localStorage synchronously on first render.
+  // Because bootstrap() awaits restoreTutorialsSeen() before calling setScreen('app'),
+  // the cloud-restored seen-set is already in localStorage by the time this runs.
+  // This avoids any render cycle where shouldShow briefly flips true → false.
+  const [shouldShow, setShouldShow] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return !getSeenLocal().has(pageKey);
+  });
 
   const dismiss = () => {
-    // Mark locally first (instant)
     const seen = getSeenLocal();
     seen.add(pageKey);
     saveSeenLocal(seen);
     setShouldShow(false);
-    // Sync to cloud (fire and forget)
     syncSeenToCloud(pageKey).catch(() => {});
   };
 

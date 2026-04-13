@@ -39,7 +39,15 @@ export default function Home() {
       loadActivePlan(),
       restoreTutorialsSeen(),
     ]);
-    if (cloudUser) saveUserProfile(cloudUser);
+    if (cloudUser) {
+      // Preserve longestStreak from localStorage — cloud doesn't store it yet.
+      // Take the higher of the two so neither direction loses data.
+      const localState = loadAppState();
+      saveUserProfile({
+        ...cloudUser,
+        longestStreak: Math.max(cloudUser.longestStreak ?? 0, localState.user?.longestStreak ?? 0),
+      });
+    }
     if (cloudPlan) saveCurrentPlan(cloudPlan);
 
     // Cloud plan is authoritative — don't let stale localStorage skip onboarding for new users
