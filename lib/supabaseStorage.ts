@@ -85,6 +85,16 @@ export async function syncPlan(plan: ThreeDayPlan): Promise<void> {
   lsSaveCurrentPlan(plan);
 }
 
+export async function deactivateCloudPlan(): Promise<void> {
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  if (!authUser) return;
+  await supabase
+    .from('user_plans')
+    .update({ is_active: false })
+    .eq('user_id', authUser.id)
+    .eq('is_active', true);
+}
+
 export async function loadActivePlan(): Promise<ThreeDayPlan | null> {
   const { data: { user: authUser } } = await supabase.auth.getUser();
   if (!authUser) return null;

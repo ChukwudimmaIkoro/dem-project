@@ -7,7 +7,7 @@ import {
   loadAppState, updatePlan, clearAppState,
   saveCurrentPlan, hasShownEnergyModal, saveEnergyModalShown,
 } from '@/lib/storage';
-import { syncPlan, syncUserProfile } from '@/lib/supabaseStorage';
+import { syncPlan, syncUserProfile, deactivateCloudPlan } from '@/lib/supabaseStorage';
 import {
   isDayComplete, calculateStreak,
   generatePlan, generateThreeDayPlan, shuffleDietMeals,
@@ -109,8 +109,6 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const [lastPillar,      setLastPillar]      = useState<'diet' | 'exercise' | 'mentality'>('diet');
   const [userName,        setUserName]        = useState('');
   const [userFoods,       setUserFoods]       = useState<string[]>([]);
-  const [showDayWarning,  setShowDayWarning]  = useState(false);
-  const [pendingDayIdx,   setPendingDayIdx]   = useState<number | null>(null);
   // Energy transition overlay
   const [showEnergyTransition, setShowEnergyTransition] = useState(false);
   const [transitionEnergy,     setTransitionEnergy]     = useState<EnergyLevel>('medium');
@@ -128,9 +126,10 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const konamiProgress = useRef(0);
 
   // Tutorials — one per context
-  const homeTutorial          = useTutorial('home');
+  const homeTutorial           = useTutorial('home');
   const streakCompleteTutorial = useTutorial('streakComplete');
-  const dietTutorial          = useTutorial('diet');
+  const planExpiredTutorial    = useTutorial('planExpired');
+  const dietTutorial           = useTutorial('diet');
 
   // Drag-to-scroll refs for horizontal scrollable containers
   const dayNavDrag      = useDragScroll();
@@ -229,7 +228,10 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const theme        = ENERGY_THEME[currentDay.energyLevel];
   const activeDayIdx = getActiveDayIndex(plan);
   // Past days are view-only: user can navigate back but not interact
-  const isPastDay    = currentDayIndex < activeDayIdx;
+  const isPastDay       = currentDayIndex < activeDayIdx;
+  const allDaysComplete = plan.days.every(d => isDayComplete(d));
+  // Plan expired = real time has passed last day but plan was never fully completed
+  const planExpired     = !allDaysComplete && activeDayIdx >= (plan.planLength ?? 3) - 1 && activeDayIdx > 0;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -291,20 +293,12 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   };
 
   const handleDayChange = (dayIdx: number) => {
-    // Block navigation to days that haven't started yet (dev panel is the way to advance in dev)
-    if (dayIdx > getActiveDayIndex(plan)) return;
-    if (dayIdx > currentDayIndex && !isDayComplete(plan.days[currentDayIndex])) {
-      setPendingDayIdx(dayIdx);
-      setShowDayWarning(true);
-      return;
-    }
+    if (dayIdx > getActiveDayIndex(plan)) return; // future days are locked
     commitDayChange(dayIdx);
   };
 
   const commitDayChange = (dayIdx: number) => {
     setCurrentDayIndex(dayIdx);
-    setShowDayWarning(false);
-    setPendingDayIdx(null);
     const dayNumber = plan.days[dayIdx].dayNumber;
     // Only show energy modal for the current active day, not past days
     const isActiveDayOrLater = dayIdx >= getActiveDayIndex(plan);
@@ -317,6 +311,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     if (confirm('Start over? This will clear your current progress.')) {
       clearAppState();
       clearTutorialsSeen().catch(() => {});
+      deactivateCloudPlan().catch(() => {}); // so bootstrap routes to onboarding on reload
       onReset();
     }
   };
@@ -327,11 +322,18 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     const completedDays = plan.days.filter(d => isDayComplete(d)).length;
     const newPlan = generatePlan(state.user, newLength);
     newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
-    // carryOverStreak = all days ever completed across all plans (shown in streak badge)
-    newPlan.carryOverStreak  = (plan.carryOverStreak ?? 0) + completedDays;
-    newPlan.dummyCurrency    = (plan.dummyCurrency ?? 0) + completedDays * 10;
-    // Day 1 inherits current day's energy so it feels continuous
-    newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
+    // Don't double-count: if currentDay is complete, calculateStreak(newPlan) will
+    // count it as Day 1 complete — so subtract it from carryOverStreak
+    const transferComplete = isDayComplete(currentDay);
+    newPlan.carryOverStreak = (plan.carryOverStreak ?? 0) + completedDays - (transferComplete ? 1 : 0);
+    newPlan.dummyCurrency   = (plan.dummyCurrency ?? 0) + completedDays * 10;
+    // Day 1 inherits current day's energy AND completed state
+    newPlan.days[0] = {
+      ...newPlan.days[0],
+      energyLevel:  currentDay.energyLevel,
+      completed:    { ...currentDay.completed },
+      energyLocked: transferComplete,
+    };
     saveCurrentPlan(newPlan);
     setPlan(newPlan);
     setCurrentDayIndex(0);
@@ -474,12 +476,9 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   if (activeBottomTab === 'progress') {
     const energyHistory     = plan.days.map(d => d.energyLevel);
     const completionHistory = plan.days.map(d => d.completed);
-    const allDaysComplete      = plan.days.every(d => isDayComplete(d));
-    const planLength           = plan.planLength ?? 3;
-    // Plan expired = all days have passed in real time but plan is NOT fully complete
-    const planExpired          = !allDaysComplete && activeDayIdx >= planLength - 1 && activeDayIdx > 0;
-    // Streak goal selector only unlocks after the user has completed at least one full streak
-    const streakGoalUnlocked   = (plan.historicalStreak ?? 0) > 0 || allDaysComplete || planExpired;
+    const planLength         = plan.planLength ?? 3;
+    // Streak goal selector unlocks after first full streak, or when plan is done/expired
+    const streakGoalUnlocked = (plan.historicalStreak ?? 0) > 0 || allDaysComplete || planExpired;
 
     return (
       <EnergyBackground energy={currentDay.energyLevel}>
@@ -727,53 +726,6 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
         onSelect={handleEnergySelect}
         dayNumber={currentDay.dayNumber}
       />
-
-      {/* Incomplete day warning */}
-      <AnimatePresence>
-        {showDayWarning && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ background: 'rgba(0,0,0,0.55)' }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl"
-              initial={{ scale: 0.85, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 340, damping: 26 }}
-            >
-              <div className="text-center mb-5">
-                <div className="text-5xl mb-3">⚠️</div>
-                <h3 className="text-lg font-black text-gray-900 mb-1">
-                  Day {currentDay.dayNumber} isn't done yet!
-                </h3>
-                <p className="text-gray-500 text-sm">
-                  You haven't completed all tasks. Move on anyway?
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <Button
-                  variant="secondary"
-                  onClick={() => { setShowDayWarning(false); setPendingDayIdx(null); }}
-                  className="flex-1"
-                >
-                  Stay here
-                </Button>
-                <Button
-                  onClick={() => pendingDayIdx !== null && commitDayChange(pendingDayIdx)}
-                  className="flex-1"
-                  energyColor={theme.accent}
-                >
-                  Move on
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <div className="min-h-screen pb-24 px-4">
         {/* Header */}
@@ -1049,8 +1001,10 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       <AnimatePresence>
         {homeTutorial.shouldShow ? (
           <MascotTutorial key="tut-home" slides={TUTORIALS.home} onDismiss={homeTutorial.dismiss} />
-        ) : plan.days.every(d => isDayComplete(d)) && streakCompleteTutorial.shouldShow ? (
+        ) : allDaysComplete && streakCompleteTutorial.shouldShow ? (
           <MascotTutorial key="tut-streak-complete" slides={TUTORIALS.streakComplete} onDismiss={streakCompleteTutorial.dismiss} />
+        ) : planExpired && planExpiredTutorial.shouldShow ? (
+          <MascotTutorial key="tut-plan-expired" slides={TUTORIALS.planExpired} onDismiss={planExpiredTutorial.dismiss} />
         ) : activePillar === 'diet' && dietTutorial.shouldShow ? (
           <MascotTutorial key="tut-diet" slides={TUTORIALS.diet} onDismiss={dietTutorial.dismiss} />
         ) : activePillar === 'exercise' && exerciseTutorial.shouldShow ? (
