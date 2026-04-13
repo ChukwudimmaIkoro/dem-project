@@ -105,7 +105,8 @@ export interface ThreeDayPlan {
   days: DayPlan[];
   currentDay: number;
   streak: number;
-  historicalStreak: number;               // total completed streaks across all plans
+  historicalStreak: number;               // total completed plan cycles
+  carryOverStreak: number;                // total days carried over from all previous plans (for display)
   dummyCurrency: number;                  // placeholder for future monetization
 }
 
