@@ -28,4 +28,9 @@ export const TUTORIALS: Record<string, TutorialSlide[]> = {
     { message: "Ready to level up? Head to the Progress tab and set a longer streak goal. Try for 5, 7, 14, or even 30 days!" },
     { message: "The longer the streak, the deeper the habit. You've got this!" },
   ],
+  planExpired: [
+    { message: "It's okay to be inconsistent at the start — showing up is the first step." },
+    { message: "Head to the Progress tab to start a fresh plan. You can go for the same 3 days, or level up to something longer!" },
+    { message: "Every attempt builds the habit. Don't give up — Dem will be here when you're ready." },
+  ],
 };
