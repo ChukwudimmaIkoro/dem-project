@@ -919,6 +919,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 onToggle={() => toggleTask('exercise')}
                 onEditPrefs={() => setEditingPrefs('exercise')}
                 isPastDay={isPastDay}
+              />
             )}
             {activePillar === 'mentality' && (
               <MentalityView
