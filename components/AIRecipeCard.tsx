@@ -11,6 +11,7 @@ interface AIRecipeCardProps {
   energyLevel: 'low' | 'medium' | 'high';
   dayNumber: number;
   userName?: string;
+  locked?: boolean;
 }
 
 const MEAL_META: Record<string, { label: string; emoji: string; bg: string; border: string; textColor: string }> = {
@@ -26,7 +27,7 @@ const ENERGY_ACCENT: Record<string, { color: string; shadow: string }> = {
   low:    { color: '#3b82f6', shadow: '#1d4ed8' },
 };
 
-export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, userName }: AIRecipeCardProps) {
+export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, userName, locked }: AIRecipeCardProps) {
   const [recipe, setRecipe]   = useState<CachedRecipe | null>(null);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -41,7 +42,7 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
   }, [dayNumber, mealType]);
 
   const handleGenerate = async () => {
-    if (foods.length === 0) return;
+    if (locked || foods.length === 0) return;
     setLoading(true);
     setError('');
     try {
@@ -91,7 +92,7 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
           </div>
         </div>
 
-        {!recipe && (
+        {!recipe && !locked && (
           <motion.button
             onClick={handleGenerate}
             disabled={loading || foods.length === 0}
@@ -271,8 +272,8 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
                 </motion.div>
               )}
 
-              {/* Re-generate button */}
-              <motion.button
+              {/* Re-generate button — hidden for past days */}
+              {!locked && <motion.button
                 onClick={handleGenerate}
                 disabled={loading}
                 className="mt-3 w-full py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5"
@@ -286,7 +287,7 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
               >
                 <Sparkles className="w-3 h-3" />
                 {loading ? 'Generating...' : 'New suggestion'}
-              </motion.button>
+              </motion.button>}
             </div>
           </motion.div>
         )}
