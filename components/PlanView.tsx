@@ -194,6 +194,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       const newPlan = generatePlan(state.user, plan.planLength ?? 3);
       newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
       newPlan.dummyCurrency    = plan.dummyCurrency ?? 0;
+      newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
       saveCurrentPlan(newPlan);
       setPlan(newPlan);
       setCurrentDayIndex(0);
@@ -319,22 +320,29 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
 
   const handleStreakExtension = (newLength: 3 | 5 | 7 | 14 | 30) => {
     const state = loadAppState();
-    if (!state.user || !state.currentPlan) return;
+    if (!state.user) return;
+    // Use plan from React state — always the freshest source
     const newPlan = generatePlan(state.user, newLength);
-    newPlan.historicalStreak = (state.currentPlan.historicalStreak ?? 0) + 1;
-    newPlan.dummyCurrency    = (state.currentPlan.dummyCurrency ?? 0) + (state.currentPlan.planLength ?? 3) * 10;
+    newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
+    newPlan.dummyCurrency    = (plan.dummyCurrency ?? 0) + (plan.planLength ?? 3) * 10;
+    // Day 1 inherits current day's energy so it feels continuous
+    newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
     saveCurrentPlan(newPlan);
     setPlan(newPlan);
     setCurrentDayIndex(0);
+    clearTutorialsSeen().catch(() => {});
   };
 
   // Called from progress tab streak goal selector
   const handleStreakGoalChange = (newLength: 3 | 5 | 7 | 14 | 30) => {
-    const allDone = plan.days.every(d => isDayComplete(d));
-    if ((plan.planLength ?? 3) === newLength && !allDone) return; // already this length, not done — no-op
-    if (allDone) {
+    const allDone    = plan.days.every(d => isDayComplete(d));
+    const expired    = !allDone && activeDayIdx >= (plan.planLength ?? 3) - 1 && activeDayIdx > 0;
+    if (allDone || expired) {
+      // Plan complete or expired — start fresh (same length allowed, no streak credit for expired)
       handleStreakExtension(newLength);
     } else {
+      // Mid-plan change — warn and restart
+      if ((plan.planLength ?? 3) === newLength) return; // same length mid-plan is a no-op
       setPendingStreakLength(newLength);
       setShowStreakChangeWarning(true);
     }
@@ -352,6 +360,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
         const newPlan = generatePlan(state.user, plan.planLength ?? 3);
         newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
         newPlan.dummyCurrency    = plan.dummyCurrency ?? 0;
+        newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
         saveCurrentPlan(newPlan);
         setPlan(newPlan);
         setCurrentDayIndex(0);
@@ -454,8 +463,10 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     const completionHistory = plan.days.map(d => d.completed);
     const allDaysComplete      = plan.days.every(d => isDayComplete(d));
     const planLength           = plan.planLength ?? 3;
+    // Plan expired = all days have passed in real time but plan is NOT fully complete
+    const planExpired          = !allDaysComplete && activeDayIdx >= planLength - 1 && activeDayIdx > 0;
     // Streak goal selector only unlocks after the user has completed at least one full streak
-    const streakGoalUnlocked   = (plan.historicalStreak ?? 0) > 0 || allDaysComplete;
+    const streakGoalUnlocked   = (plan.historicalStreak ?? 0) > 0 || allDaysComplete || planExpired;
 
     return (
       <EnergyBackground energy={currentDay.energyLevel}>
@@ -469,12 +480,14 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 animate={{ scale: streak > 0 ? [1, 1.08, 1] : 1 }}
                 transition={{ duration: 0.4 }}
               >
-                <Flame className="w-10 h-10" style={{ color: theme.accent }} />
-                <span className="text-6xl font-black" style={{ color: theme.accent }}>{streak}</span>
+                <Flame className="w-10 h-10" style={{ color: planExpired ? '#9ca3af' : theme.accent }} />
+                <span className="text-6xl font-black" style={{ color: planExpired ? '#9ca3af' : theme.accent }}>{streak}</span>
               </motion.div>
               <p className="font-black text-gray-800 text-lg">Day Streak</p>
               <p className="text-gray-500 text-sm mt-1">
-                {streak === 0
+                {planExpired
+                  ? "It's okay to be inconsistent at the start — showing up is the first step."
+                  : streak === 0
                   ? 'Complete today to start your streak!'
                   : `${streak} day${streak !== 1 ? 's' : ''} completed, amazing work!`}
               </p>
@@ -556,6 +569,8 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                   <p className="text-[11px] text-gray-400 mt-2 text-center">
                     {allDaysComplete
                       ? 'Tap a length to begin your next streak!'
+                      : planExpired
+                      ? 'Choose a plan length to start fresh — same or longer!'
                       : 'Changing mid-plan will restart your current progress.'}
                   </p>
                 </>
