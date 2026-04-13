@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   no_mentality_preference BOOLEAN DEFAULT FALSE,
   historical_streak       INTEGER DEFAULT 0,
   dummy_currency          INTEGER DEFAULT 0,
+  longest_streak          INTEGER DEFAULT 0,
   tutorials_seen          TEXT[] DEFAULT '{}',
   created_at              TIMESTAMPTZ DEFAULT NOW()
 );

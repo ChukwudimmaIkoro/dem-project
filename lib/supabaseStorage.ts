@@ -28,6 +28,7 @@ export async function syncUserProfile(user: UserProfile): Promise<void> {
     no_food_preference:     user.noFoodPreference ?? false,
     no_exercise_preference: user.noExercisePreference ?? false,
     no_mentality_preference:user.noMentalityPreference ?? false,
+    longest_streak:         user.longestStreak ?? 0,
     created_at:             user.createdAt,
   });
 
@@ -56,6 +57,7 @@ export async function loadUserProfile(): Promise<UserProfile | null> {
     noFoodPreference:       data.no_food_preference,
     noExercisePreference:   data.no_exercise_preference,
     noMentalityPreference:  data.no_mentality_preference,
+    longestStreak:          data.longest_streak ?? 0,
     createdAt:              data.created_at,
   };
 }
