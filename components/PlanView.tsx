@@ -194,7 +194,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       const completedDays = plan.days.filter(d => isDayComplete(d)).length;
       newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
       newPlan.carryOverStreak  = (plan.carryOverStreak ?? 0) + completedDays;
-      newPlan.dummyCurrency    = plan.dummyCurrency ?? 0;
+      newPlan.dummyCurrency    = (plan.dummyCurrency ?? 0) + completedDays * 10;
       newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
       saveCurrentPlan(newPlan);
       setPlan(newPlan);
@@ -318,18 +318,12 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     const completedDays = plan.days.filter(d => isDayComplete(d)).length;
     const newPlan = generatePlan(state.user, newLength);
     newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
-    // Don't double-count: if currentDay is complete, calculateStreak(newPlan) will
-    // count it as Day 1 complete — so subtract it from carryOverStreak
-    const transferComplete = isDayComplete(currentDay);
-    newPlan.carryOverStreak = (plan.carryOverStreak ?? 0) + completedDays - (transferComplete ? 1 : 0);
+    // carryOverStreak accumulates all completed days from previous plans — no subtraction
+    // calculateStreak(newPlan) starts at 0 since day 1 is fresh, so display = carryOverStreak + 0 = correct
+    newPlan.carryOverStreak = (plan.carryOverStreak ?? 0) + completedDays;
     newPlan.dummyCurrency   = (plan.dummyCurrency ?? 0) + completedDays * 10;
-    // Day 1 inherits current day's energy AND completed state
-    newPlan.days[0] = {
-      ...newPlan.days[0],
-      energyLevel:  currentDay.energyLevel,
-      completed:    { ...currentDay.completed },
-      energyLocked: transferComplete,
-    };
+    // Day 1 inherits current day's energy only — completed state always starts fresh
+    newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
     saveCurrentPlan(newPlan);
     setPlan(newPlan);
     setCurrentDayIndex(0);
@@ -364,7 +358,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
         const newPlan = generatePlan(state.user, plan.planLength ?? 3);
         newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
         newPlan.carryOverStreak  = (plan.carryOverStreak ?? 0) + completedDays;
-        newPlan.dummyCurrency    = plan.dummyCurrency ?? 0;
+        newPlan.dummyCurrency    = (plan.dummyCurrency ?? 0) + completedDays * 10;
         newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
         saveCurrentPlan(newPlan);
         setPlan(newPlan);
@@ -924,7 +918,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 isCompleted={currentDay.completed.exercise}
                 onToggle={() => toggleTask('exercise')}
                 onEditPrefs={() => setEditingPrefs('exercise')}
-              />
+                isPastDay={isPastDay}
             )}
             {activePillar === 'mentality' && (
               <MentalityView
@@ -1211,8 +1205,9 @@ function MealSectionShuffleable({ title, items, Icon, mealKey, spinning, onShuff
 
 // ─── Exercise view ───────────────────────────────────────────────────────────────
 
-function ExerciseView({ day, isCompleted, onToggle, onEditPrefs }: {
+function ExerciseView({ day, isCompleted, onToggle, onEditPrefs, isPastDay }: {
   day: DayPlan; isCompleted: boolean; onToggle: () => void; onEditPrefs: () => void;
+  isPastDay?: boolean;
 }) {
   return (
     <Card>
@@ -1260,6 +1255,7 @@ function ExerciseView({ day, isCompleted, onToggle, onEditPrefs }: {
               description={ex.description}
               intensity={ex.intensity}
               energyLevel={day.energyLevel}
+              locked={isPastDay}
             />
           </div>
         ))}
