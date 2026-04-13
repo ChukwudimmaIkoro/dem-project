@@ -192,7 +192,9 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       const state = loadAppState();
       if (!state.user) return;
       const newPlan = generatePlan(state.user, plan.planLength ?? 3);
+      const completedDays = plan.days.filter(d => isDayComplete(d)).length;
       newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
+      newPlan.carryOverStreak  = (plan.carryOverStreak ?? 0) + completedDays;
       newPlan.dummyCurrency    = plan.dummyCurrency ?? 0;
       newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
       saveCurrentPlan(newPlan);
@@ -221,7 +223,8 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   if (!plan) return <div className="p-4 text-center text-gray-400 pt-20">Loading...</div>;
 
   const currentDay   = plan.days[currentDayIndex];
-  const streak       = calculateStreak(plan);
+  // Total displayed streak = days completed in this plan + all carried-over days from previous plans
+  const streak       = (plan.carryOverStreak ?? 0) + calculateStreak(plan);
   const isComplete   = isDayComplete(currentDay);
   const theme        = ENERGY_THEME[currentDay.energyLevel];
   const activeDayIdx = getActiveDayIndex(plan);
@@ -321,10 +324,12 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const handleStreakExtension = (newLength: 3 | 5 | 7 | 14 | 30) => {
     const state = loadAppState();
     if (!state.user) return;
-    // Use plan from React state — always the freshest source
+    const completedDays = plan.days.filter(d => isDayComplete(d)).length;
     const newPlan = generatePlan(state.user, newLength);
     newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
-    newPlan.dummyCurrency    = (plan.dummyCurrency ?? 0) + (plan.planLength ?? 3) * 10;
+    // carryOverStreak = all days ever completed across all plans (shown in streak badge)
+    newPlan.carryOverStreak  = (plan.carryOverStreak ?? 0) + completedDays;
+    newPlan.dummyCurrency    = (plan.dummyCurrency ?? 0) + completedDays * 10;
     // Day 1 inherits current day's energy so it feels continuous
     newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
     saveCurrentPlan(newPlan);
@@ -357,8 +362,10 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       if (allDone && onLastDay) {
         const state = loadAppState();
         if (!state.user) return;
+        const completedDays = plan.days.filter(d => isDayComplete(d)).length;
         const newPlan = generatePlan(state.user, plan.planLength ?? 3);
         newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
+        newPlan.carryOverStreak  = (plan.carryOverStreak ?? 0) + completedDays;
         newPlan.dummyCurrency    = plan.dummyCurrency ?? 0;
         newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
         saveCurrentPlan(newPlan);
@@ -367,8 +374,14 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
         clearTutorialsSeen().catch(() => {});
         return;
       }
-      const next = Math.min(currentDayIndex + 1, plan.days.length - 1);
-      setCurrentDayIndex(next);
+      // Rewind startDate by 1 day so getActiveDayIndex() persists correctly on reload
+      const targetIdx = Math.min(currentDayIndex + 1, plan.days.length - 1);
+      const today = new Date();
+      const newStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - targetIdx);
+      updatePlan(p => ({ ...p, startDate: newStart.toISOString() }));
+      const s = loadAppState();
+      if (s.currentPlan) setPlan(s.currentPlan);
+      setCurrentDayIndex(targetIdx);
     } else if (action === 'complete') {
       updatePlan(p => {
         const updated = { ...p, days: [...p.days] };

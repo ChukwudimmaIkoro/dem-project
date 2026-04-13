@@ -198,6 +198,7 @@ export function generatePlan(
     currentDay:       1,
     streak:           0,
     historicalStreak: 0,
+    carryOverStreak:  0,
     dummyCurrency:    0,
   };
 }
