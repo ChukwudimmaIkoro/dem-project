@@ -265,16 +265,22 @@ export function isDayComplete(day: DayPlan): boolean {
 }
 
 /**
- * Calculate current streak
+ * Calculate current streak.
+ * Pass activeDayIdx so gray days (past + incomplete) fully break the chain.
+ * Any incomplete day before activeDayIdx → return 0 immediately.
+ * Otherwise count consecutive complete days from Day 1.
  */
-export function calculateStreak(plan: ThreeDayPlan): number {
+export function calculateStreak(plan: ThreeDayPlan, activeDayIdx?: number): number {
+  const activeIdx = activeDayIdx ?? (plan.days.length - 1);
+  // Any past day that wasn't completed = gray day = streak fully broken
+  for (let i = 0; i < activeIdx; i++) {
+    if (!isDayComplete(plan.days[i])) return 0;
+  }
+  // Count consecutive complete days from Day 1
   let streak = 0;
   for (const day of plan.days) {
-    if (isDayComplete(day)) {
-      streak++;
-    } else {
-      break;
-    }
+    if (isDayComplete(day)) streak++;
+    else break;
   }
   return streak;
 }

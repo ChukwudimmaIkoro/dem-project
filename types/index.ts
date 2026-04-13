@@ -51,6 +51,7 @@ export interface UserProfile {
   noFoodPreference?: boolean;      // true = skip food selection, rotate from full database
   noExercisePreference?: boolean;  // true = skip exercise selection
   noMentalityPreference?: boolean; // true = skip mentality selection
+  longestStreak?: number;          // highest streak ever reached — never reset on streak loss
   createdAt: string;
 }
 

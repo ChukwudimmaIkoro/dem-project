@@ -1,11 +1,11 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Calendar, User, Trophy } from 'lucide-react';
+import { Calendar, User, Trophy, Settings } from 'lucide-react';
 
 interface BottomNavProps {
-  activeTab: 'plan' | 'account' | 'progress';
-  onTabChange: (tab: 'plan' | 'account' | 'progress') => void;
+  activeTab: 'plan' | 'account' | 'progress' | 'settings';
+  onTabChange: (tab: 'plan' | 'account' | 'progress' | 'settings') => void;
   accentColor?: string;
 }
 
@@ -13,6 +13,7 @@ const TABS = [
   { id: 'plan'     as const, Icon: Calendar, label: 'Plan'     },
   { id: 'progress' as const, Icon: Trophy,   label: 'Progress' },
   { id: 'account'  as const, Icon: User,     label: 'Account'  },
+  { id: 'settings' as const, Icon: Settings, label: 'Settings' },
 ];
 
 export default function BottomNav({ activeTab, onTabChange, accentColor = '#22c55e' }: BottomNavProps) {

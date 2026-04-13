@@ -5,9 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ThreeDayPlan, DayPlan, EnergyLevel } from '@/types';
 import {
   loadAppState, updatePlan, clearAppState,
-  saveCurrentPlan, hasShownEnergyModal, saveEnergyModalShown,
+  saveCurrentPlan, saveUserProfile, hasShownEnergyModal, saveEnergyModalShown,
 } from '@/lib/storage';
 import { syncPlan, syncUserProfile, deactivateCloudPlan } from '@/lib/supabaseStorage';
+import { supabase } from '@/lib/supabase';
 import {
   isDayComplete, calculateStreak,
   generatePlan, generateThreeDayPlan, shuffleDietMeals,
@@ -101,7 +102,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const [plan,            setPlan]           = useState<ThreeDayPlan | null>(null);
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
-  const [activeBottomTab, setActiveBottomTab] = useState<'plan' | 'account' | 'progress'>('plan');
+  const [activeBottomTab, setActiveBottomTab] = useState<'plan' | 'account' | 'progress' | 'settings'>('plan');
   const [activePillar,    setActivePillar]    = useState<'diet' | 'exercise' | 'mentality'>('diet');
   const [showEnergyModal, setShowEnergyModal] = useState(false);
   const [energySetMessage, setEnergySetMessage] = useState('');
@@ -173,9 +174,32 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     return () => window.removeEventListener('keydown', handleKonami);
   }, []);
 
-  // Background sync — every plan state change writes to Supabase (fire and forget)
+  // Background sync — every plan state change writes to Supabase (fire and forget).
+  // Also updates longestStreak on the user profile if the current streak is a new high.
   useEffect(() => {
-    if (plan) syncPlan(plan).catch(() => {});
+    if (!plan) return;
+    syncPlan(plan).catch(() => {});
+    const activeIdx      = getActiveDayIndex(plan);
+    const currentStreak  = (plan.carryOverStreak ?? 0) + calculateStreak(plan, activeIdx);
+    const state          = loadAppState();
+    if (state.user && currentStreak > (state.user.longestStreak ?? 0)) {
+      const updatedUser = { ...state.user, longestStreak: currentStreak };
+      saveUserProfile(updatedUser);
+      syncUserProfile(updatedUser).catch(() => {});
+    }
+  }, [plan]);
+
+  // Gray-day detection: if any day before the active day is incomplete (missed),
+  // reset carryOverStreak to 0 — the chain is broken from a previous plan too.
+  useEffect(() => {
+    if (!plan) return;
+    const activeIdx = getActiveDayIndex(plan);
+    const hasGrayDay = plan.days.slice(0, activeIdx).some(d => !isDayComplete(d));
+    if (hasGrayDay && (plan.carryOverStreak ?? 0) !== 0) {
+      const updated = { ...plan, carryOverStreak: 0 };
+      saveCurrentPlan(updated);
+      setPlan(updated);
+    }
   }, [plan]);
 
   // Auto-restart: if the plan is fully complete AND real time has moved past the last day,
@@ -222,12 +246,12 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   if (!plan) return <div className="p-4 text-center text-gray-400 pt-20">Loading...</div>;
 
   const currentDay   = plan.days[currentDayIndex];
-  // Total displayed streak = days completed in this plan + all carried-over days from previous plans
-  // carryOverStreak may be undefined on old plans — always default to 0
-  const streak       = (plan.carryOverStreak ?? 0) + calculateStreak(plan);
+  const activeDayIdx = getActiveDayIndex(plan);
+  // Total displayed streak = days completed in this plan + all carried-over days from previous plans.
+  // calculateStreak returns 0 if any past day is gray (missed), breaking the chain.
+  const streak       = (plan.carryOverStreak ?? 0) + calculateStreak(plan, activeDayIdx);
   const isComplete   = isDayComplete(currentDay);
   const theme        = ENERGY_THEME[currentDay.energyLevel];
-  const activeDayIdx = getActiveDayIndex(plan);
   // Past days are view-only: user can navigate back but not interact
   const isPastDay       = currentDayIndex < activeDayIdx;
   const allDaysComplete = plan.days.every(d => isDayComplete(d));
@@ -312,18 +336,54 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (!confirm('Permanently delete your account? All your data will be removed. This cannot be undone.')) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await fetch('/api/delete-account', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+      }
+      clearAppState();
+      clearTutorialsSeen().catch(() => {});
+      onSignOut();
+    } catch {
+      alert('Failed to delete account. Please try again.');
+    }
+  };
+
   const handleStreakExtension = (newLength: 3 | 5 | 7 | 14 | 30) => {
     const state = loadAppState();
     if (!state.user) return;
-    const completedDays = plan.days.filter(d => isDayComplete(d)).length;
+
+    // Displayed streak BEFORE the switch (already accounts for gray days via calculateStreak)
+    const displayedStreak = (plan.carryOverStreak ?? 0) + calculateStreak(plan, activeDayIdx);
+    // Use the real active day from the old plan (not the UI-selected day)
+    const activeDay     = plan.days[activeDayIdx];
+    const activeDayDone = isDayComplete(activeDay);
+
     const newPlan = generatePlan(state.user, newLength);
     newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
-    // carryOverStreak accumulates all completed days from previous plans — no subtraction
-    // calculateStreak(newPlan) starts at 0 since day 1 is fresh, so display = carryOverStreak + 0 = correct
-    newPlan.carryOverStreak = (plan.carryOverStreak ?? 0) + completedDays;
-    newPlan.dummyCurrency   = (plan.dummyCurrency ?? 0) + completedDays * 10;
-    // Day 1 inherits current day's energy only — completed state always starts fresh
-    newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
+    newPlan.dummyCurrency    = (plan.dummyCurrency ?? 0) + displayedStreak * 10;
+
+    // Transfer current active day's partial/full progress + energy to Day 1
+    newPlan.days[0] = {
+      ...newPlan.days[0],
+      energyLevel:  activeDay.energyLevel,
+      completed:    { ...activeDay.completed },
+      energyLocked: activeDayDone,
+    };
+
+    // Keep displayed streak unchanged after the switch:
+    //   If active day WAS done: calculateStreak(newPlan) = 1, so carryOver = displayedStreak - 1
+    //   If active day NOT done: calculateStreak(newPlan) = 0, so carryOver = displayedStreak
+    // This prevents the streak from jumping by 1 just because you switched plans.
+    newPlan.carryOverStreak = activeDayDone
+      ? Math.max(0, displayedStreak - 1)
+      : displayedStreak;
+
     saveCurrentPlan(newPlan);
     setPlan(newPlan);
     setCurrentDayIndex(0);
@@ -405,7 +465,8 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   // ── Account tab ──────────────────────────────────────────────────────────
 
   if (activeBottomTab === 'account') {
-    const displayInitial = (authUserName || authUserEmail || 'D')[0].toUpperCase();
+    const displayInitial  = (authUserName || authUserEmail || 'D')[0].toUpperCase();
+    const longestStreak   = loadAppState().user?.longestStreak ?? 0;
     return (
       <EnergyBackground energy={currentDay.energyLevel}>
         <div className="min-h-screen pb-24 p-4">
@@ -433,17 +494,21 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
               >
                 Progress synced to your account
               </div>
+
+              {/* Stats row */}
+              <div className="flex gap-3 mb-4">
+                <div className="flex-1 rounded-2xl p-3 text-center" style={{ background: '#f9fafb', border: '2px solid #e5e7eb' }}>
+                  <div className="text-2xl font-black" style={{ color: theme.accent }}>{streak}</div>
+                  <div className="text-[11px] text-gray-400 font-semibold mt-0.5">Current Streak</div>
+                </div>
+                <div className="flex-1 rounded-2xl p-3 text-center" style={{ background: '#f9fafb', border: '2px solid #e5e7eb' }}>
+                  <div className="text-2xl font-black" style={{ color: theme.accent }}>{longestStreak}</div>
+                  <div className="text-[11px] text-gray-400 font-semibold mt-0.5">Longest Streak</div>
+                </div>
+              </div>
+
               <Button variant="ghost" onClick={onSignOut} className="w-full text-gray-500">
                 Sign Out
-              </Button>
-            </Card>
-
-            {/* Danger zone */}
-            <Card>
-              <h3 className="font-black text-gray-700 text-sm mb-3">Danger Zone</h3>
-              <Button variant="ghost" onClick={handleReset} className="w-full text-red-500">
-                <RotateCcw className="w-4 h-4 mr-2 inline" />
-                Reset All Progress
               </Button>
             </Card>
 
@@ -453,6 +518,81 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
             energy={currentDay.energyLevel}
             userName={userName}
             firstVisitMessage={`Hey ${userName || 'friend'}! This is your account page.`}
+          />
+          <BottomNav activeTab={activeBottomTab} onTabChange={setActiveBottomTab} accentColor={theme.accent} />
+          <DevPanel show={showDevPanel} onToggle={() => setShowDevPanel(v => !v)} onAction={handleDevAction} devUnlocked={devUnlocked} />
+        </div>
+      </EnergyBackground>
+    );
+  }
+
+  // ── Settings tab ─────────────────────────────────────────────────────────
+
+  if (activeBottomTab === 'settings') {
+    return (
+      <EnergyBackground energy={currentDay.energyLevel}>
+        <div className="min-h-screen pb-24 p-4">
+          <div className="pt-8 space-y-4">
+
+            {/* Account settings — name/password change (coming soon) */}
+            <Card>
+              <h3 className="font-black text-gray-800 text-base mb-4">Account Settings</h3>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1 block">
+                    Display Name
+                  </label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      disabled
+                      defaultValue={authUserName || userName || ''}
+                      placeholder="Your name"
+                      className="flex-1 rounded-xl px-3 py-2.5 text-sm text-gray-400 bg-gray-50 border-2 border-gray-100 outline-none"
+                    />
+                    <span className="text-[10px] font-bold text-gray-300 whitespace-nowrap">Coming soon</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1 block">
+                    Password
+                  </label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      disabled
+                      type="password"
+                      defaultValue="••••••••"
+                      className="flex-1 rounded-xl px-3 py-2.5 text-sm text-gray-400 bg-gray-50 border-2 border-gray-100 outline-none"
+                    />
+                    <span className="text-[10px] font-bold text-gray-300 whitespace-nowrap">Coming soon</span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Danger zone */}
+            <Card>
+              <h3 className="font-black text-gray-700 text-sm mb-1">Danger Zone</h3>
+              <p className="text-xs text-gray-400 mb-4">These actions cannot be undone.</p>
+
+              <div className="space-y-2">
+                <Button variant="ghost" onClick={handleReset} className="w-full text-red-500">
+                  <RotateCcw className="w-4 h-4 mr-2 inline" />
+                  Reset All Progress
+                </Button>
+                <Button variant="ghost" onClick={handleDeleteAccount} className="w-full text-red-600 font-black">
+                  Delete Account
+                </Button>
+              </div>
+            </Card>
+
+          </div>
+
+          <FloatingMascot
+            energy={currentDay.energyLevel}
+            userName={userName}
+            firstVisitMessage={`Settings live here. Tap the gear anytime.`}
           />
           <BottomNav activeTab={activeBottomTab} onTabChange={setActiveBottomTab} accentColor={theme.accent} />
           <DevPanel show={showDevPanel} onToggle={() => setShowDevPanel(v => !v)} onAction={handleDevAction} devUnlocked={devUnlocked} />
