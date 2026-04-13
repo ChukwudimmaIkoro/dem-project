@@ -223,6 +223,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
 
   const currentDay   = plan.days[currentDayIndex];
   // Total displayed streak = days completed in this plan + all carried-over days from previous plans
+  // carryOverStreak may be undefined on old plans — always default to 0
   const streak       = (plan.carryOverStreak ?? 0) + calculateStreak(plan);
   const isComplete   = isDayComplete(currentDay);
   const theme        = ENERGY_THEME[currentDay.energyLevel];
@@ -261,30 +262,25 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     if (isPastDay) return;
     if (currentDay.completed[pillar]) return;
     const wasComplete = isComplete;
-    updatePlan(p => {
-      const updated = { ...p, days: [...p.days] };
-      updated.days[currentDayIndex] = {
-        ...updated.days[currentDayIndex],
-        completed: {
-          ...updated.days[currentDayIndex].completed,
-          [pillar]: true,
-        },
-      };
-      // Lock energy once all 3 pillars are done
-      if (isDayComplete(updated.days[currentDayIndex]) && !wasComplete) {
-        updated.days[currentDayIndex] = { ...updated.days[currentDayIndex], energyLocked: true };
-      }
-      return updated;
-    });
 
-    const s = loadAppState();
-    if (!s.currentPlan) return;
-    setPlan(s.currentPlan);
+    // Build updated plan directly — don't re-read from localStorage to avoid race conditions
+    const updatedDays = [...plan.days];
+    updatedDays[currentDayIndex] = {
+      ...updatedDays[currentDayIndex],
+      completed: { ...updatedDays[currentDayIndex].completed, [pillar]: true },
+    };
+    if (isDayComplete(updatedDays[currentDayIndex]) && !wasComplete) {
+      updatedDays[currentDayIndex] = { ...updatedDays[currentDayIndex], energyLocked: true };
+    }
+    const updatedPlan = { ...plan, days: updatedDays };
 
-    const nowComplete = isDayComplete(s.currentPlan.days[currentDayIndex]);
+    // Persist then set React state from the same object — no localStorage round-trip
+    saveCurrentPlan(updatedPlan);
+    setPlan(updatedPlan);
+
+    const nowComplete = isDayComplete(updatedDays[currentDayIndex]);
     if (nowComplete && !wasComplete) {
-      // Only celebrate if day 1, or if previous day was also completed (building a streak)
-      const prevDone = currentDayIndex === 0 || isDayComplete(s.currentPlan.days[currentDayIndex - 1]);
+      const prevDone = currentDayIndex === 0 || isDayComplete(updatedDays[currentDayIndex - 1]);
       if (prevDone) {
         setShowCelebration(true);
         setTimeout(() => setShowCelebration(false), 2200);
@@ -918,6 +914,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 userName={userName}
                 userFoods={userFoods}
                 accentColor={theme.accent}
+                isPastDay={isPastDay}
                 onEditPrefs={() => setEditingPrefs('diet')}
               />
             )}
@@ -1092,9 +1089,10 @@ function DevPanel({
 
 // ─── Diet view ───────────────────────────────────────────────────────────────────
 
-function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor, onEditPrefs }: {
+function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor, onEditPrefs, isPastDay }: {
   day: DayPlan; isCompleted: boolean; onToggle: () => void;
   userName?: string; userFoods: string[]; accentColor: string; onEditPrefs: () => void;
+  isPastDay?: boolean;
 }) {
   const [meals,   setMeals]   = useState(day.diet.meals);
   const [spinning, setSpinning] = useState<string | null>(null);
@@ -1151,32 +1149,33 @@ function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor
 
       <MealSectionShuffleable title="Breakfast" items={meals.breakfast} Icon={Sunrise}
         mealKey="breakfast" spinning={spinning === 'breakfast'} onShuffle={() => shuffleMeal('breakfast')}
-        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} />
+        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} />
       <MealSectionShuffleable title="Lunch" items={meals.lunch} Icon={Sun}
         mealKey="lunch" spinning={spinning === 'lunch'} onShuffle={() => shuffleMeal('lunch')}
-        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} />
+        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} />
       <MealSectionShuffleable title="Dinner" items={meals.dinner} Icon={Moon}
         mealKey="dinner" spinning={spinning === 'dinner'} onShuffle={() => shuffleMeal('dinner')}
-        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} />
+        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} />
       {meals.snack && meals.snack.length > 0 && (
         <MealSectionShuffleable title="Snack" items={meals.snack} Icon={Coffee}
           mealKey="snack" spinning={spinning === 'snack'} onShuffle={() => shuffleMeal('snack')}
-          dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} />
+          dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} />
       )}
     </Card>
   );
 }
 
-function MealSectionShuffleable({ title, items, Icon, mealKey, spinning, onShuffle, dayNumber, energyLevel, userName }: {
+function MealSectionShuffleable({ title, items, Icon, mealKey, spinning, onShuffle, dayNumber, energyLevel, userName, isPastDay }: {
   title: string; items: string[]; Icon: LucideIcon;
   mealKey: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   spinning: boolean; onShuffle: () => void;
+  isPastDay?: boolean;
   dayNumber: number; energyLevel: EnergyLevel; userName?: string;
 }) {
   return (
     <div className="mb-3">
       <AIRecipeCard foods={items ?? []} mealType={mealKey}
-        energyLevel={energyLevel} dayNumber={dayNumber} userName={userName} />
+        energyLevel={energyLevel} dayNumber={dayNumber} userName={userName} locked={isPastDay} />
       <div className="bg-gray-50 p-3 rounded-2xl">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
