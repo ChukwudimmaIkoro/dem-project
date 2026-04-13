@@ -180,7 +180,8 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     if (!plan) return;
     syncPlan(plan).catch(() => {});
     const activeIdx      = getActiveDayIndex(plan);
-    const currentStreak  = (plan.carryOverStreak ?? 0) + calculateStreak(plan, activeIdx);
+    const gray           = plan.days.slice(0, activeIdx).some(d => !isDayComplete(d));
+    const currentStreak  = (gray ? 0 : (plan.carryOverStreak ?? 0)) + calculateStreak(plan, activeIdx);
     const state          = loadAppState();
     if (state.user && currentStreak > (state.user.longestStreak ?? 0)) {
       const updatedUser = { ...state.user, longestStreak: currentStreak };
@@ -189,16 +190,15 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     }
   }, [plan]);
 
-  // Gray-day detection: if any day before the active day is incomplete (missed),
-  // reset carryOverStreak to 0 — the chain is broken from a previous plan too.
+  // Gray-day persistence: when a past day goes gray, persist carryOverStreak = 0 to
+  // localStorage so handleStreakExtension reads the correct value. The UI already
+  // uses effectiveCarryOver computed during render, so no setPlan needed here.
   useEffect(() => {
     if (!plan) return;
     const activeIdx = getActiveDayIndex(plan);
-    const hasGrayDay = plan.days.slice(0, activeIdx).some(d => !isDayComplete(d));
-    if (hasGrayDay && (plan.carryOverStreak ?? 0) !== 0) {
-      const updated = { ...plan, carryOverStreak: 0 };
-      saveCurrentPlan(updated);
-      setPlan(updated);
+    const gray = plan.days.slice(0, activeIdx).some(d => !isDayComplete(d));
+    if (gray && (plan.carryOverStreak ?? 0) !== 0) {
+      saveCurrentPlan({ ...plan, carryOverStreak: 0 });
     }
   }, [plan]);
 
@@ -247,9 +247,12 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
 
   const currentDay   = plan.days[currentDayIndex];
   const activeDayIdx = getActiveDayIndex(plan);
-  // Total displayed streak = days completed in this plan + all carried-over days from previous plans.
-  // calculateStreak returns 0 if any past day is gray (missed), breaking the chain.
-  const streak       = (plan.carryOverStreak ?? 0) + calculateStreak(plan, activeDayIdx);
+  // If any past day is gray (missed), the carry-over from previous plans is forfeit.
+  // Compute this inline during render — never rely on an effect to update it first,
+  // which avoids any timing window where the displayed streak shows a stale value.
+  const hasGrayDay      = plan.days.slice(0, activeDayIdx).some(d => !isDayComplete(d));
+  const effectiveCarryOver = hasGrayDay ? 0 : (plan.carryOverStreak ?? 0);
+  const streak          = effectiveCarryOver + calculateStreak(plan, activeDayIdx);
   const isComplete   = isDayComplete(currentDay);
   const theme        = ENERGY_THEME[currentDay.energyLevel];
   // Past days are view-only: user can navigate back but not interact
@@ -358,8 +361,9 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     const state = loadAppState();
     if (!state.user) return;
 
-    // Displayed streak BEFORE the switch (already accounts for gray days via calculateStreak)
-    const displayedStreak = (plan.carryOverStreak ?? 0) + calculateStreak(plan, activeDayIdx);
+    // Displayed streak BEFORE the switch — use same gray-day-aware formula as render
+    const gray = plan.days.slice(0, activeDayIdx).some(d => !isDayComplete(d));
+    const displayedStreak = (gray ? 0 : (plan.carryOverStreak ?? 0)) + calculateStreak(plan, activeDayIdx);
     // Use the real active day from the old plan (not the UI-selected day)
     const activeDay     = plan.days[activeDayIdx];
     const activeDayDone = isDayComplete(activeDay);
