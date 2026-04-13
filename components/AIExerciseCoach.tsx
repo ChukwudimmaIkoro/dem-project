@@ -11,6 +11,7 @@ interface AIExerciseCoachProps {
   description: string;
   intensity: string;
   energyLevel: 'low' | 'medium' | 'high';
+  locked?: boolean;
 }
 
 const ENERGY_ACCENT: Record<string, { color: string; shadow: string }> = {
@@ -20,7 +21,7 @@ const ENERGY_ACCENT: Record<string, { color: string; shadow: string }> = {
 };
 
 export default function AIExerciseCoach({
-  exerciseId, exerciseName, description, intensity, energyLevel,
+  exerciseId, exerciseName, description, intensity, energyLevel, locked,
 }: AIExerciseCoachProps) {
   const [coaching, setCoaching] = useState<CachedExerciseCoach | null>(null);
   const [loading, setLoading]   = useState(false);
@@ -35,6 +36,7 @@ export default function AIExerciseCoach({
   }, [exerciseId, energyLevel]);
 
   const handleGenerate = async () => {
+    if (locked) return;
     setLoading(true);
     setError('');
     try {
@@ -86,7 +88,7 @@ export default function AIExerciseCoach({
             {expanded ? 'Hide' : 'Show'}
             {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
-        ) : (
+        ) : !locked ? (
           <motion.button
             onClick={handleGenerate}
             disabled={loading}
@@ -108,7 +110,7 @@ export default function AIExerciseCoach({
             )}
             {loading ? 'Loading...' : 'Get coaching tips'}
           </motion.button>
-        )}
+        ) : null}
       </div>
 
       {/* Error state */}

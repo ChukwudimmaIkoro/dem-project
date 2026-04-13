@@ -7,7 +7,7 @@ import {
   loadAppState, updatePlan, clearAppState,
   saveCurrentPlan, hasShownEnergyModal, saveEnergyModalShown,
 } from '@/lib/storage';
-import { syncPlan, syncUserProfile } from '@/lib/supabaseStorage';
+import { syncPlan, syncUserProfile, deactivateCloudPlan } from '@/lib/supabaseStorage';
 import {
   isDayComplete, calculateStreak,
   generatePlan, generateThreeDayPlan, shuffleDietMeals,
@@ -33,7 +33,7 @@ import FloatingMascot from './FloatingMascot';
 import { useDragScroll } from '@/hooks/useDragScroll';
 import MascotTutorial from './MascotTutorial';
 import { TUTORIALS } from '@/lib/tutorials';
-import { useTutorial } from '@/hooks/useTutorial';
+import { useTutorial, clearTutorialsSeen } from '@/hooks/useTutorial';
 
 // ─── Energy theme tokens ────────────────────────────────────────────────────────
 
@@ -126,9 +126,10 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const konamiProgress = useRef(0);
 
   // Tutorials — one per context
-  const homeTutorial          = useTutorial('home');
+  const homeTutorial           = useTutorial('home');
   const streakCompleteTutorial = useTutorial('streakComplete');
-  const dietTutorial          = useTutorial('diet');
+  const planExpiredTutorial    = useTutorial('planExpired');
+  const dietTutorial           = useTutorial('diet');
 
   // Drag-to-scroll refs for horizontal scrollable containers
   const dayNavDrag      = useDragScroll();
@@ -190,11 +191,15 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       const state = loadAppState();
       if (!state.user) return;
       const newPlan = generatePlan(state.user, plan.planLength ?? 3);
-      newPlan.historicalStreak = plan.historicalStreak ?? 0;
-      newPlan.dummyCurrency    = plan.dummyCurrency ?? 0;
+      const completedDays = plan.days.filter(d => isDayComplete(d)).length;
+      newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
+      newPlan.carryOverStreak  = (plan.carryOverStreak ?? 0) + completedDays;
+      newPlan.dummyCurrency    = (plan.dummyCurrency ?? 0) + completedDays * 10;
+      newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
       saveCurrentPlan(newPlan);
       setPlan(newPlan);
       setCurrentDayIndex(0);
+      clearTutorialsSeen().catch(() => {});
     }
   }, [plan]);
 
@@ -217,12 +222,17 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   if (!plan) return <div className="p-4 text-center text-gray-400 pt-20">Loading...</div>;
 
   const currentDay   = plan.days[currentDayIndex];
-  const streak       = calculateStreak(plan);
+  // Total displayed streak = days completed in this plan + all carried-over days from previous plans
+  // carryOverStreak may be undefined on old plans — always default to 0
+  const streak       = (plan.carryOverStreak ?? 0) + calculateStreak(plan);
   const isComplete   = isDayComplete(currentDay);
   const theme        = ENERGY_THEME[currentDay.energyLevel];
   const activeDayIdx = getActiveDayIndex(plan);
   // Past days are view-only: user can navigate back but not interact
-  const isPastDay    = currentDayIndex < activeDayIdx;
+  const isPastDay       = currentDayIndex < activeDayIdx;
+  const allDaysComplete = plan.days.every(d => isDayComplete(d));
+  // Plan expired = real time has passed last day but plan was never fully completed
+  const planExpired     = !allDaysComplete && activeDayIdx >= (plan.planLength ?? 3) - 1 && activeDayIdx > 0;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -252,30 +262,25 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     if (isPastDay) return;
     if (currentDay.completed[pillar]) return;
     const wasComplete = isComplete;
-    updatePlan(p => {
-      const updated = { ...p, days: [...p.days] };
-      updated.days[currentDayIndex] = {
-        ...updated.days[currentDayIndex],
-        completed: {
-          ...updated.days[currentDayIndex].completed,
-          [pillar]: true,
-        },
-      };
-      // Lock energy once all 3 pillars are done
-      if (isDayComplete(updated.days[currentDayIndex]) && !wasComplete) {
-        updated.days[currentDayIndex] = { ...updated.days[currentDayIndex], energyLocked: true };
-      }
-      return updated;
-    });
 
-    const s = loadAppState();
-    if (!s.currentPlan) return;
-    setPlan(s.currentPlan);
+    // Build updated plan directly — don't re-read from localStorage to avoid race conditions
+    const updatedDays = [...plan.days];
+    updatedDays[currentDayIndex] = {
+      ...updatedDays[currentDayIndex],
+      completed: { ...updatedDays[currentDayIndex].completed, [pillar]: true },
+    };
+    if (isDayComplete(updatedDays[currentDayIndex]) && !wasComplete) {
+      updatedDays[currentDayIndex] = { ...updatedDays[currentDayIndex], energyLocked: true };
+    }
+    const updatedPlan = { ...plan, days: updatedDays };
 
-    const nowComplete = isDayComplete(s.currentPlan.days[currentDayIndex]);
+    // Persist then set React state from the same object — no localStorage round-trip
+    saveCurrentPlan(updatedPlan);
+    setPlan(updatedPlan);
+
+    const nowComplete = isDayComplete(updatedDays[currentDayIndex]);
     if (nowComplete && !wasComplete) {
-      // Only celebrate if day 1, or if previous day was also completed (building a streak)
-      const prevDone = currentDayIndex === 0 || isDayComplete(s.currentPlan.days[currentDayIndex - 1]);
+      const prevDone = currentDayIndex === 0 || isDayComplete(updatedDays[currentDayIndex - 1]);
       if (prevDone) {
         setShowCelebration(true);
         setTimeout(() => setShowCelebration(false), 2200);
@@ -284,8 +289,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   };
 
   const handleDayChange = (dayIdx: number) => {
-    // Only allow navigation to past days and the current active day — never future
-    if (dayIdx > getActiveDayIndex(plan)) return;
+    if (dayIdx > getActiveDayIndex(plan)) return; // future days are locked
     commitDayChange(dayIdx);
   };
 
@@ -302,28 +306,40 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const handleReset = () => {
     if (confirm('Start over? This will clear your current progress.')) {
       clearAppState();
+      clearTutorialsSeen().catch(() => {});
+      deactivateCloudPlan().catch(() => {}); // so bootstrap routes to onboarding on reload
       onReset();
     }
   };
 
   const handleStreakExtension = (newLength: 3 | 5 | 7 | 14 | 30) => {
     const state = loadAppState();
-    if (!state.user || !state.currentPlan) return;
+    if (!state.user) return;
+    const completedDays = plan.days.filter(d => isDayComplete(d)).length;
     const newPlan = generatePlan(state.user, newLength);
-    newPlan.historicalStreak = (state.currentPlan.historicalStreak ?? 0) + 1;
-    newPlan.dummyCurrency    = (state.currentPlan.dummyCurrency ?? 0) + (state.currentPlan.planLength ?? 3) * 10;
+    newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
+    // carryOverStreak accumulates all completed days from previous plans — no subtraction
+    // calculateStreak(newPlan) starts at 0 since day 1 is fresh, so display = carryOverStreak + 0 = correct
+    newPlan.carryOverStreak = (plan.carryOverStreak ?? 0) + completedDays;
+    newPlan.dummyCurrency   = (plan.dummyCurrency ?? 0) + completedDays * 10;
+    // Day 1 inherits current day's energy only — completed state always starts fresh
+    newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
     saveCurrentPlan(newPlan);
     setPlan(newPlan);
     setCurrentDayIndex(0);
+    clearTutorialsSeen().catch(() => {});
   };
 
   // Called from progress tab streak goal selector
   const handleStreakGoalChange = (newLength: 3 | 5 | 7 | 14 | 30) => {
-    const allDone = plan.days.every(d => isDayComplete(d));
-    if ((plan.planLength ?? 3) === newLength && !allDone) return; // already this length, not done — no-op
-    if (allDone) {
+    const allDone    = plan.days.every(d => isDayComplete(d));
+    const expired    = !allDone && activeDayIdx >= (plan.planLength ?? 3) - 1 && activeDayIdx > 0;
+    if (allDone || expired) {
+      // Plan complete or expired — start fresh (same length allowed, no streak credit for expired)
       handleStreakExtension(newLength);
     } else {
+      // Mid-plan change — warn and restart
+      if ((plan.planLength ?? 3) === newLength) return; // same length mid-plan is a no-op
       setPendingStreakLength(newLength);
       setShowStreakChangeWarning(true);
     }
@@ -332,8 +348,32 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   // Dev-only quick actions
   const handleDevAction = (action: 'next' | 'complete' | 'reset') => {
     if (action === 'next') {
-      const next = Math.min(currentDayIndex + 1, plan.days.length - 1);
-      setCurrentDayIndex(next);
+      const allDone = plan.days.every(d => isDayComplete(d));
+      const onLastDay = currentDayIndex >= plan.days.length - 1;
+      // If all days complete and on last day, trigger restart instead of clamping
+      if (allDone && onLastDay) {
+        const state = loadAppState();
+        if (!state.user) return;
+        const completedDays = plan.days.filter(d => isDayComplete(d)).length;
+        const newPlan = generatePlan(state.user, plan.planLength ?? 3);
+        newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
+        newPlan.carryOverStreak  = (plan.carryOverStreak ?? 0) + completedDays;
+        newPlan.dummyCurrency    = (plan.dummyCurrency ?? 0) + completedDays * 10;
+        newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
+        saveCurrentPlan(newPlan);
+        setPlan(newPlan);
+        setCurrentDayIndex(0);
+        clearTutorialsSeen().catch(() => {});
+        return;
+      }
+      // Rewind startDate by 1 day so getActiveDayIndex() persists correctly on reload
+      const targetIdx = Math.min(currentDayIndex + 1, plan.days.length - 1);
+      const today = new Date();
+      const newStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - targetIdx);
+      updatePlan(p => ({ ...p, startDate: newStart.toISOString() }));
+      const s = loadAppState();
+      if (s.currentPlan) setPlan(s.currentPlan);
+      setCurrentDayIndex(targetIdx);
     } else if (action === 'complete') {
       updatePlan(p => {
         const updated = { ...p, days: [...p.days] };
@@ -426,10 +466,9 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   if (activeBottomTab === 'progress') {
     const energyHistory     = plan.days.map(d => d.energyLevel);
     const completionHistory = plan.days.map(d => d.completed);
-    const allDaysComplete      = plan.days.every(d => isDayComplete(d));
-    const planLength           = plan.planLength ?? 3;
-    // Streak goal selector only unlocks after the user has completed at least one full streak
-    const streakGoalUnlocked   = (plan.historicalStreak ?? 0) > 0 || allDaysComplete;
+    const planLength         = plan.planLength ?? 3;
+    // Streak goal selector unlocks after first full streak, or when plan is done/expired
+    const streakGoalUnlocked = (plan.historicalStreak ?? 0) > 0 || allDaysComplete || planExpired;
 
     return (
       <EnergyBackground energy={currentDay.energyLevel}>
@@ -443,12 +482,14 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 animate={{ scale: streak > 0 ? [1, 1.08, 1] : 1 }}
                 transition={{ duration: 0.4 }}
               >
-                <Flame className="w-10 h-10" style={{ color: theme.accent }} />
-                <span className="text-6xl font-black" style={{ color: theme.accent }}>{streak}</span>
+                <Flame className="w-10 h-10" style={{ color: planExpired ? '#9ca3af' : theme.accent }} />
+                <span className="text-6xl font-black" style={{ color: planExpired ? '#9ca3af' : theme.accent }}>{streak}</span>
               </motion.div>
               <p className="font-black text-gray-800 text-lg">Day Streak</p>
               <p className="text-gray-500 text-sm mt-1">
-                {streak === 0
+                {planExpired
+                  ? "It's okay to be inconsistent at the start — showing up is the first step."
+                  : streak === 0
                   ? 'Complete today to start your streak!'
                   : `${streak} day${streak !== 1 ? 's' : ''} completed, amazing work!`}
               </p>
@@ -530,6 +571,8 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                   <p className="text-[11px] text-gray-400 mt-2 text-center">
                     {allDaysComplete
                       ? 'Tap a length to begin your next streak!'
+                      : planExpired
+                      ? 'Choose a plan length to start fresh — same or longer!'
                       : 'Changing mid-plan will restart your current progress.'}
                   </p>
                 </>
@@ -865,6 +908,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 userName={userName}
                 userFoods={userFoods}
                 accentColor={theme.accent}
+                isPastDay={isPastDay}
                 onEditPrefs={() => setEditingPrefs('diet')}
               />
             )}
@@ -874,7 +918,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 isCompleted={currentDay.completed.exercise}
                 onToggle={() => toggleTask('exercise')}
                 onEditPrefs={() => setEditingPrefs('exercise')}
-              />
+                isPastDay={isPastDay}
             )}
             {activePillar === 'mentality' && (
               <MentalityView
@@ -948,8 +992,10 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       <AnimatePresence>
         {homeTutorial.shouldShow ? (
           <MascotTutorial key="tut-home" slides={TUTORIALS.home} onDismiss={homeTutorial.dismiss} />
-        ) : plan.days.every(d => isDayComplete(d)) && streakCompleteTutorial.shouldShow ? (
+        ) : allDaysComplete && streakCompleteTutorial.shouldShow ? (
           <MascotTutorial key="tut-streak-complete" slides={TUTORIALS.streakComplete} onDismiss={streakCompleteTutorial.dismiss} />
+        ) : planExpired && planExpiredTutorial.shouldShow ? (
+          <MascotTutorial key="tut-plan-expired" slides={TUTORIALS.planExpired} onDismiss={planExpiredTutorial.dismiss} />
         ) : activePillar === 'diet' && dietTutorial.shouldShow ? (
           <MascotTutorial key="tut-diet" slides={TUTORIALS.diet} onDismiss={dietTutorial.dismiss} />
         ) : activePillar === 'exercise' && exerciseTutorial.shouldShow ? (
@@ -995,7 +1041,7 @@ function DevPanel({
   onAction: (a: 'next' | 'complete' | 'reset') => void;
   devUnlocked: boolean;
 }) {
-  if (!DEV_MODE || !devUnlocked) return null;
+  if (!devUnlocked) return null;
   return (
     <>
       <motion.button
@@ -1037,9 +1083,10 @@ function DevPanel({
 
 // ─── Diet view ───────────────────────────────────────────────────────────────────
 
-function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor, onEditPrefs }: {
+function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor, onEditPrefs, isPastDay }: {
   day: DayPlan; isCompleted: boolean; onToggle: () => void;
   userName?: string; userFoods: string[]; accentColor: string; onEditPrefs: () => void;
+  isPastDay?: boolean;
 }) {
   const [meals,   setMeals]   = useState(day.diet.meals);
   const [spinning, setSpinning] = useState<string | null>(null);
@@ -1096,32 +1143,33 @@ function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor
 
       <MealSectionShuffleable title="Breakfast" items={meals.breakfast} Icon={Sunrise}
         mealKey="breakfast" spinning={spinning === 'breakfast'} onShuffle={() => shuffleMeal('breakfast')}
-        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} />
+        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} />
       <MealSectionShuffleable title="Lunch" items={meals.lunch} Icon={Sun}
         mealKey="lunch" spinning={spinning === 'lunch'} onShuffle={() => shuffleMeal('lunch')}
-        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} />
+        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} />
       <MealSectionShuffleable title="Dinner" items={meals.dinner} Icon={Moon}
         mealKey="dinner" spinning={spinning === 'dinner'} onShuffle={() => shuffleMeal('dinner')}
-        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} />
+        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} />
       {meals.snack && meals.snack.length > 0 && (
         <MealSectionShuffleable title="Snack" items={meals.snack} Icon={Coffee}
           mealKey="snack" spinning={spinning === 'snack'} onShuffle={() => shuffleMeal('snack')}
-          dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} />
+          dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} />
       )}
     </Card>
   );
 }
 
-function MealSectionShuffleable({ title, items, Icon, mealKey, spinning, onShuffle, dayNumber, energyLevel, userName }: {
+function MealSectionShuffleable({ title, items, Icon, mealKey, spinning, onShuffle, dayNumber, energyLevel, userName, isPastDay }: {
   title: string; items: string[]; Icon: LucideIcon;
   mealKey: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   spinning: boolean; onShuffle: () => void;
+  isPastDay?: boolean;
   dayNumber: number; energyLevel: EnergyLevel; userName?: string;
 }) {
   return (
     <div className="mb-3">
       <AIRecipeCard foods={items ?? []} mealType={mealKey}
-        energyLevel={energyLevel} dayNumber={dayNumber} userName={userName} />
+        energyLevel={energyLevel} dayNumber={dayNumber} userName={userName} locked={isPastDay} />
       <div className="bg-gray-50 p-3 rounded-2xl">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
@@ -1157,8 +1205,9 @@ function MealSectionShuffleable({ title, items, Icon, mealKey, spinning, onShuff
 
 // ─── Exercise view ───────────────────────────────────────────────────────────────
 
-function ExerciseView({ day, isCompleted, onToggle, onEditPrefs }: {
+function ExerciseView({ day, isCompleted, onToggle, onEditPrefs, isPastDay }: {
   day: DayPlan; isCompleted: boolean; onToggle: () => void; onEditPrefs: () => void;
+  isPastDay?: boolean;
 }) {
   return (
     <Card>
@@ -1206,6 +1255,7 @@ function ExerciseView({ day, isCompleted, onToggle, onEditPrefs }: {
               description={ex.description}
               intensity={ex.intensity}
               energyLevel={day.energyLevel}
+              locked={isPastDay}
             />
           </div>
         ))}
