@@ -35,6 +35,20 @@ async function syncSeenToCloud(key: string): Promise<void> {
     .eq('id', user.id);
 }
 
+// ── Public: clear all seen tutorials (on plan reset) ────────────────────────
+
+export async function clearTutorialsSeen(): Promise<void> {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(LS_KEY);
+  }
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase
+    .from('user_profiles')
+    .update({ tutorials_seen: [] })
+    .eq('id', user.id);
+}
+
 // ── Public: pull cloud seen-set into localStorage on login ───────────────────
 
 export async function restoreTutorialsSeen(): Promise<void> {
