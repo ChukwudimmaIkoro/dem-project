@@ -33,7 +33,7 @@ import FloatingMascot from './FloatingMascot';
 import { useDragScroll } from '@/hooks/useDragScroll';
 import MascotTutorial from './MascotTutorial';
 import { TUTORIALS } from '@/lib/tutorials';
-import { useTutorial } from '@/hooks/useTutorial';
+import { useTutorial, clearTutorialsSeen } from '@/hooks/useTutorial';
 
 // ─── Energy theme tokens ────────────────────────────────────────────────────────
 
@@ -192,11 +192,12 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       const state = loadAppState();
       if (!state.user) return;
       const newPlan = generatePlan(state.user, plan.planLength ?? 3);
-      newPlan.historicalStreak = plan.historicalStreak ?? 0;
+      newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
       newPlan.dummyCurrency    = plan.dummyCurrency ?? 0;
       saveCurrentPlan(newPlan);
       setPlan(newPlan);
       setCurrentDayIndex(0);
+      clearTutorialsSeen().catch(() => {});
     }
   }, [plan]);
 
@@ -311,6 +312,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const handleReset = () => {
     if (confirm('Start over? This will clear your current progress.')) {
       clearAppState();
+      clearTutorialsSeen().catch(() => {});
       onReset();
     }
   };
@@ -341,6 +343,21 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   // Dev-only quick actions
   const handleDevAction = (action: 'next' | 'complete' | 'reset') => {
     if (action === 'next') {
+      const allDone = plan.days.every(d => isDayComplete(d));
+      const onLastDay = currentDayIndex >= plan.days.length - 1;
+      // If all days complete and on last day, trigger restart instead of clamping
+      if (allDone && onLastDay) {
+        const state = loadAppState();
+        if (!state.user) return;
+        const newPlan = generatePlan(state.user, plan.planLength ?? 3);
+        newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
+        newPlan.dummyCurrency    = plan.dummyCurrency ?? 0;
+        saveCurrentPlan(newPlan);
+        setPlan(newPlan);
+        setCurrentDayIndex(0);
+        clearTutorialsSeen().catch(() => {});
+        return;
+      }
       const next = Math.min(currentDayIndex + 1, plan.days.length - 1);
       setCurrentDayIndex(next);
     } else if (action === 'complete') {
@@ -1051,7 +1068,7 @@ function DevPanel({
   onAction: (a: 'next' | 'complete' | 'reset') => void;
   devUnlocked: boolean;
 }) {
-  if (!DEV_MODE || !devUnlocked) return null;
+  if (!devUnlocked) return null;
   return (
     <>
       <motion.button

@@ -161,5 +161,6 @@ export function clearAppState(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(ENERGY_MODAL_KEY);
-  localStorage.removeItem(AI_CACHE_KEY);
+  // AI cache is intentionally preserved — it's validated by planId on load,
+  // so if the same plan reloads after sign-in, cached recipes are still available.
 }
