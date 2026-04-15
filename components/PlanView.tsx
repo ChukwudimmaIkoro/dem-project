@@ -250,7 +250,6 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     saveCurrentPlan(newPlan);
     setPlan(newPlan);
     setCurrentDayIndex(0);
-    clearTutorialsSeen().catch(() => {});
   }, [plan]);
 
   // Mascot message on pillar tab change
@@ -418,7 +417,6 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     saveCurrentPlan(newPlan);
     setPlan(newPlan);
     setCurrentDayIndex(0);
-    clearTutorialsSeen().catch(() => {});
   };
 
   // Called from progress tab streak goal selector
@@ -441,20 +439,25 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     if (action === 'next') {
       const allDone = plan.days.every(d => isDayComplete(d));
       const onLastDay = currentDayIndex >= plan.days.length - 1;
-      // If all days complete and on last day, trigger restart instead of clamping
-      if (allDone && onLastDay) {
+      // On last day: restart regardless of completion. Only credit streak when all done.
+      if (onLastDay) {
         const state = loadAppState();
         if (!state.user) return;
-        const completedDays = plan.days.filter(d => isDayComplete(d)).length;
         const newPlan = generatePlan(state.user, plan.planLength ?? 3);
-        newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
-        newPlan.carryOverStreak  = (plan.carryOverStreak ?? 0) + completedDays;
-        newPlan.dummyCurrency    = (plan.dummyCurrency ?? 0) + completedDays * 10;
+        if (allDone) {
+          const completedDays = plan.days.filter(d => isDayComplete(d)).length;
+          newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
+          newPlan.carryOverStreak  = (plan.carryOverStreak ?? 0) + completedDays;
+          newPlan.dummyCurrency    = (plan.dummyCurrency ?? 0) + completedDays * 10;
+        } else {
+          newPlan.historicalStreak = plan.historicalStreak ?? 0;
+          newPlan.carryOverStreak  = 0;
+          newPlan.dummyCurrency    = plan.dummyCurrency ?? 0;
+        }
         newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
         saveCurrentPlan(newPlan);
         setPlan(newPlan);
         setCurrentDayIndex(0);
-        clearTutorialsSeen().catch(() => {});
         return;
       }
       // Rewind startDate by 1 day so getActiveDayIndex() persists correctly on reload

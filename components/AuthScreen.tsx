@@ -49,6 +49,12 @@ export default function AuthScreen({ onAuth }: AuthScreenProps) {
           options: { data: { name: name.trim() || 'Friend' } },
         });
         if (signUpError) throw signUpError;
+        // Supabase returns a fake success (no error) for existing emails when email
+        // confirmation is enabled, but identities will be an empty array.
+        if ((data.user?.identities?.length ?? 1) === 0) {
+          setError('An account with this email already exists. Try signing in instead.');
+          return;
+        }
         // If session is null, email confirmation is required — show pending state.
         // onAuthStateChange fires automatically when user confirms.
         if (!data.session) { setPendingEmail(email); return; }
