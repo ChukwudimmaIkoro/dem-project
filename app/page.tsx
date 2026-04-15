@@ -33,15 +33,17 @@ export default function Home() {
   const bootstrap = useCallback(async (user: User) => {
     setAuthUser(user);
 
-    // Restore cloud data → localStorage so the app always starts from the latest synced state
-    const [cloudUser, cloudPlan] = await Promise.all([
+    // Restore cloud data → localStorage. Use allSettled so a Supabase hiccup on one
+    // call doesn't block the others or leave the user stuck on the loading screen.
+    const [userResult, planResult] = await Promise.allSettled([
       loadUserProfile(),
       loadActivePlan(),
       restoreTutorialsSeen(),
     ]);
+    const cloudUser = userResult.status === 'fulfilled' ? userResult.value : null;
+    const cloudPlan = planResult.status === 'fulfilled' ? planResult.value : null;
     if (cloudUser) {
-      // Preserve longestStreak from localStorage — cloud doesn't store it yet.
-      // Take the higher of the two so neither direction loses data.
+      // Preserve longestStreak from localStorage — take the higher of cloud vs local.
       const localState = loadAppState();
       saveUserProfile({
         ...cloudUser,

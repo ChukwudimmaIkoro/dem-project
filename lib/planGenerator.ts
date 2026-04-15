@@ -275,6 +275,7 @@ export function isDayComplete(day: DayPlan): boolean {
  */
 export function calculateStreak(plan: ThreeDayPlan, activeDayIdx?: number): number {
   const activeIdx = activeDayIdx ?? (plan.days.length - 1);
+  if (activeIdx < 0 || activeIdx >= plan.days.length) return 0;
   // Start from activeIdx if it's complete, otherwise from the day before it
   const startIdx = isDayComplete(plan.days[activeIdx]) ? activeIdx : activeIdx - 1;
   if (startIdx < 0) return 0;
