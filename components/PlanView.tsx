@@ -20,7 +20,8 @@ import { Button } from './Button';
 import { Card } from './Card';
 import {
   Check, Flame, RotateCcw, Utensils, Dumbbell, Brain,
-  Sunrise, Sun, Moon, Coffee, Sparkles, Wrench, Settings2, type LucideIcon,
+  Sunrise, Sun, Moon, Coffee, Sparkles, Wrench, Settings2,
+  Lock, CheckCircle2, Eye, Circle, Clock, Lightbulb, type LucideIcon,
 } from 'lucide-react';
 import BottomNav from './BottomNav';
 import PillarTabs from './PillarTabs';
@@ -695,7 +696,15 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                         border:     `2px solid ${done ? theme.accent : isNow ? `${theme.accent}44` : '#e5e7eb'}`,
                       }}
                     >
-                      <div className="text-xl mb-0.5">{done ? '✅' : isNow ? '👀' : '⏳'}</div>
+                      <div className="flex justify-center mb-0.5">
+                        {done ? (
+                          <CheckCircle2 className="w-5 h-5" style={{ color: theme.accent }} />
+                        ) : isNow ? (
+                          <Eye className="w-5 h-5" style={{ color: theme.accent }} />
+                        ) : (
+                          <Circle className="w-5 h-5 text-gray-300" />
+                        )}
+                      </div>
                       <div className="text-[11px] font-black text-gray-700">Day {day.dayNumber}</div>
                       <div className="text-[10px] text-gray-400 capitalize">{day.energyLevel}</div>
                     </div>
@@ -958,12 +967,15 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 whileTap={isFuture ? {} : { scale: 0.95, y: 2 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 28 }}
               >
-                <span
-                  className="text-xl font-black"
-                  style={{ color: isCurrent ? 'white' : done ? theme.accentDark : '#6b7280' }}
-                >
-                  {done ? '✓' : isFuture ? '🔒' : idx + 1}
-                </span>
+                {done ? (
+                  <Check className="w-5 h-5" style={{ color: isCurrent ? 'white' : theme.accentDark }} />
+                ) : isFuture ? (
+                  <Lock className="w-4 h-4 text-gray-400" />
+                ) : (
+                  <span className="text-xl font-black" style={{ color: isCurrent ? 'white' : '#6b7280' }}>
+                    {idx + 1}
+                  </span>
+                )}
                 <span
                   className="text-[10px] font-bold"
                   style={{ color: isCurrent ? 'rgba(255,255,255,0.8)' : '#9ca3af' }}
@@ -1010,7 +1022,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
               style={{ background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentDark})` }}
             >
               <div className="p-4 text-center text-white">
-                <div className="text-3xl mb-1">✅</div>
+                <CheckCircle2 className="w-8 h-8 mx-auto mb-1 text-white" />
                 <p className="font-black text-lg">Day {currentDay.dayNumber} — Completed!</p>
                 <p className="text-sm opacity-85">You crushed this day. View-only now.</p>
               </div>
@@ -1482,14 +1494,15 @@ function MentalityView({ day, isCompleted, onToggle, onEditPrefs }: {
           {day.mentality.check.content}
         </p>
         <div className="flex items-center justify-center gap-1.5 text-sm text-gray-500">
-          <span>⏱</span>
+          <Clock className="w-4 h-4" />
           <span>{day.mentality.check.duration}</span>
         </div>
       </div>
 
       <div className="p-4 rounded-2xl" style={{ background: '#fef9c3', border: '2px solid #fde047' }}>
-        <p className="text-sm text-gray-700 text-center font-semibold leading-relaxed">
-          💡 Mentality is the glue. Without it, diet and exercise don't stick.
+        <p className="text-sm text-gray-700 text-center font-semibold leading-relaxed flex items-center justify-center gap-1.5">
+          <Lightbulb className="w-4 h-4 flex-shrink-0 text-yellow-500" />
+          Mentality is the glue. Without it, diet and exercise don't stick.
         </p>
       </div>
     </Card>

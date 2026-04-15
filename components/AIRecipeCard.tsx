@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChefHat, Clock, Zap, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { ChefHat, Clock, Zap, ChevronDown, Sparkles, Sunrise, Sun, Moon, Coffee, Lightbulb, type LucideIcon } from 'lucide-react';
 import { getCachedRecipe, setCachedRecipe, CachedRecipe } from '@/lib/storage';
 
 interface AIRecipeCardProps {
@@ -14,11 +14,11 @@ interface AIRecipeCardProps {
   locked?: boolean;
 }
 
-const MEAL_META: Record<string, { label: string; emoji: string; bg: string; border: string; textColor: string }> = {
-  breakfast: { label: 'Breakfast', emoji: '🌅', bg: '#fffbeb', border: '#fcd34d', textColor: '#92400e' },
-  lunch:     { label: 'Lunch',     emoji: '☀️',  bg: '#eff6ff', border: '#93c5fd', textColor: '#1e40af' },
-  dinner:    { label: 'Dinner',    emoji: '🌙', bg: '#faf5ff', border: '#c4b5fd', textColor: '#6b21a8' },
-  snack:     { label: 'Snack',     emoji: '🍏', bg: '#f0fdf4', border: '#86efac', textColor: '#166534' },
+const MEAL_META: Record<string, { label: string; Icon: LucideIcon; bg: string; border: string; textColor: string }> = {
+  breakfast: { label: 'Breakfast', Icon: Sunrise, bg: '#fffbeb', border: '#fcd34d', textColor: '#92400e' },
+  lunch:     { label: 'Lunch',     Icon: Sun,     bg: '#eff6ff', border: '#93c5fd', textColor: '#1e40af' },
+  dinner:    { label: 'Dinner',    Icon: Moon,    bg: '#faf5ff', border: '#c4b5fd', textColor: '#6b21a8' },
+  snack:     { label: 'Snack',     Icon: Coffee,  bg: '#f0fdf4', border: '#86efac', textColor: '#166534' },
 };
 
 const ENERGY_ACCENT: Record<string, { color: string; shadow: string }> = {
@@ -80,7 +80,7 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
       {/* Header row */}
       <div className="flex items-center justify-between px-4 pt-3.5 pb-3">
         <div className="flex items-center gap-2">
-          <span className="text-base">{meta.emoji}</span>
+          <meta.Icon className="w-5 h-5" style={{ color: meta.textColor }} />
           <div>
             <div className="flex items-center gap-1.5">
               <ChefHat className="w-3.5 h-3.5" style={{ color: meta.textColor }} />
@@ -267,7 +267,7 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
                   style={{ background: 'rgba(255,255,255,0.6)', border: `1.5px solid ${meta.border}` }}
                 >
                   <p className="text-xs text-gray-700">
-                    <span className="font-black">💡 Tip:</span> {recipe.tip}
+                    <span className="font-black flex items-center gap-1"><Lightbulb className="w-3 h-3 inline text-yellow-500" /> Tip:</span> {recipe.tip}
                   </p>
                 </motion.div>
               )}
