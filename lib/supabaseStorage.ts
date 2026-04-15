@@ -54,9 +54,9 @@ export async function loadUserProfile(): Promise<UserProfile | null> {
     selectedFoods:          data.selected_foods ?? [],
     selectedExercises:      data.selected_exercises ?? [],
     selectedMentality:      data.selected_mentality ?? [],
-    noFoodPreference:       data.no_food_preference,
-    noExercisePreference:   data.no_exercise_preference,
-    noMentalityPreference:  data.no_mentality_preference,
+    noFoodPreference:       data.no_food_preference ?? false,
+    noExercisePreference:   data.no_exercise_preference ?? false,
+    noMentalityPreference:  data.no_mentality_preference ?? false,
     longestStreak:          data.longest_streak ?? 0,
     createdAt:              data.created_at,
   };

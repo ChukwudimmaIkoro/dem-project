@@ -219,7 +219,9 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
       newPlan.carryOverStreak  = (plan.carryOverStreak ?? 0) + completedDays;
       newPlan.dummyCurrency    = (plan.dummyCurrency ?? 0) + completedDays * 10;
-      newPlan.days[0] = { ...newPlan.days[0], energyLevel: currentDay.energyLevel };
+      // Use the last day's energy from the plan directly — currentDay is derived from
+      // currentDayIndex which is not in this effect's dep array and could be stale.
+      newPlan.days[0] = { ...newPlan.days[0], energyLevel: plan.days[activeDayIdx].energyLevel };
       saveCurrentPlan(newPlan);
       setPlan(newPlan);
       setCurrentDayIndex(0);
@@ -344,10 +346,11 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        await fetch('/api/delete-account', {
+        const res = await fetch('/api/delete-account', {
           method: 'POST',
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
+        if (!res.ok) throw new Error('Delete failed');
       }
       clearAppState();
       clearTutorialsSeen().catch(() => {});
