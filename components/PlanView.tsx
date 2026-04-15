@@ -202,31 +202,55 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     }
   }, [plan]);
 
-  // Auto-restart: if the plan is fully complete AND real time has moved past the last day,
-  // silently generate a fresh same-length plan so the user always has something to do.
+  // Auto-restart: when real calendar time has moved past the plan period, silently start
+  // a fresh same-length plan. Handles both cases:
+  //   A) Plan fully complete + day passed → restart with streak credit
+  //   B) Plan expired but incomplete     → restart fresh, no streak credit
   useEffect(() => {
     if (!plan) return;
-    const allDone = plan.days.every(d => isDayComplete(d));
-    if (!allDone) return;
-    const activeDayIdx = getActiveDayIndex(plan);
-    // activeDayIdx === planLength - 1 means we're still on the last day in real time.
-    // Once real time advances (activeDayIdx would exceed last day), restart.
-    if (activeDayIdx >= (plan.planLength ?? 3)) {
-      const state = loadAppState();
-      if (!state.user) return;
-      const newPlan = generatePlan(state.user, plan.planLength ?? 3);
-      const completedDays = plan.days.filter(d => isDayComplete(d)).length;
+
+    // Raw (unclamped) calendar diff — this is the key: getActiveDayIndex() clamps so
+    // activeDayIdx can never exceed planLength-1, but rawDiff can exceed planLength.
+    const startStr  = plan.startDate ?? plan.createdAt;
+    const startDate = new Date(startStr);
+    const startDay  = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const today     = new Date();
+    const todayDay  = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const rawDiff   = Math.floor((todayDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24));
+    const planLen   = plan.planLength ?? 3;
+
+    // Only fire once real time has passed the last plan day
+    if (rawDiff < planLen) return;
+
+    const state = loadAppState();
+    if (!state.user) return;
+
+    const allDone       = plan.days.every(d => isDayComplete(d));
+    const completedDays = plan.days.filter(d => isDayComplete(d)).length;
+
+    const newPlan = generatePlan(state.user, planLen);
+
+    if (allDone) {
+      // Fully completed plan — carry streak forward and credit a historical cycle
       newPlan.historicalStreak = (plan.historicalStreak ?? 0) + 1;
       newPlan.carryOverStreak  = (plan.carryOverStreak ?? 0) + completedDays;
       newPlan.dummyCurrency    = (plan.dummyCurrency ?? 0) + completedDays * 10;
-      // Use the last day's energy from the plan directly — currentDay is derived from
-      // currentDayIndex which is not in this effect's dep array and could be stale.
-      newPlan.days[0] = { ...newPlan.days[0], energyLevel: plan.days[activeDayIdx].energyLevel };
-      saveCurrentPlan(newPlan);
-      setPlan(newPlan);
-      setCurrentDayIndex(0);
-      clearTutorialsSeen().catch(() => {});
+    } else {
+      // Expired but incomplete — start fresh, streak resets to 0
+      newPlan.historicalStreak = plan.historicalStreak ?? 0;
+      newPlan.carryOverStreak  = 0;
+      newPlan.dummyCurrency    = plan.dummyCurrency ?? 0;
     }
+
+    // Seed Day 1 energy from the last completed day, or the last day of the old plan
+    const lastDoneDay = [...plan.days].reverse().find(d => isDayComplete(d));
+    const energySource = lastDoneDay ?? plan.days[plan.days.length - 1];
+    newPlan.days[0] = { ...newPlan.days[0], energyLevel: energySource.energyLevel };
+
+    saveCurrentPlan(newPlan);
+    setPlan(newPlan);
+    setCurrentDayIndex(0);
+    clearTutorialsSeen().catch(() => {});
   }, [plan]);
 
   // Mascot message on pillar tab change

@@ -59,7 +59,19 @@ export default function AuthScreen({ onAuth }: AuthScreenProps) {
         if (data.user) onAuth(data.user);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      const raw = err instanceof Error ? err.message : 'Something went wrong';
+      // Map Supabase's "User already registered" to a friendlier message
+      if (
+        mode === 'signup' &&
+        (raw.toLowerCase().includes('already registered') ||
+         raw.toLowerCase().includes('already been registered') ||
+         raw.toLowerCase().includes('user already exists') ||
+         raw.toLowerCase().includes('email address is already'))
+      ) {
+        setError('An account with this email already exists. Try signing in instead.');
+      } else {
+        setError(raw);
+      }
     } finally {
       setLoading(false);
     }
