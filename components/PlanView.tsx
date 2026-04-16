@@ -23,6 +23,8 @@ import {
   Sunrise, Sun, Moon, Coffee, Sparkles, Wrench, Settings2,
   Lock, CheckCircle2, Eye, Circle, Clock, Lightbulb, type LucideIcon,
 } from 'lucide-react';
+import { CelebrationOverlay } from './CelebrationOverlay';
+import { useCelebration } from '@/hooks/useCelebration';
 import BottomNav from './BottomNav';
 import PillarTabs from './PillarTabs';
 import EnergyModal from './EnergyModal';
@@ -102,7 +104,7 @@ interface PlanViewProps {
 export default function PlanView({ onReset, onSignOut, authUserEmail, authUserName }: PlanViewProps) {
   const [plan,            setPlan]           = useState<ThreeDayPlan | null>(null);
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
-  const [showCelebration, setShowCelebration] = useState(false);
+  const { triggerCelebration, celebrationProps, celebrationKey, dismissCelebration } = useCelebration();
   const [activeBottomTab, setActiveBottomTab] = useState<'plan' | 'account' | 'progress' | 'settings'>('plan');
   const [activePillar,    setActivePillar]    = useState<'diet' | 'exercise' | 'mentality'>('diet');
   const [showEnergyModal, setShowEnergyModal] = useState(false);
@@ -335,8 +337,16 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     if (nowComplete && !wasComplete) {
       const prevDone = currentDayIndex === 0 || isDayComplete(updatedDays[currentDayIndex - 1]);
       if (prevDone) {
-        setShowCelebration(true);
-        setTimeout(() => setShowCelebration(false), 2200);
+        // Compute updated streak to decide celebration type
+        const gray       = updatedPlan.days.slice(0, activeDayIdx).some(d => !isDayComplete(d));
+        const newStreak  = (gray ? 0 : (updatedPlan.carryOverStreak ?? 0)) + calculateStreak(updatedPlan, activeDayIdx);
+        const MILESTONES = [3, 7, 30];
+        if (MILESTONES.includes(newStreak)) {
+          const nextMilestone = [7, 30, 50, 100].find(m => m > newStreak) ?? 100;
+          triggerCelebration({ type: 'streak_milestone', streakCount: newStreak, nextMilestone });
+        } else {
+          triggerCelebration({ type: 'tasks_complete' });
+        }
       }
     }
   };
@@ -1121,40 +1131,14 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
 
       <BottomNav activeTab={activeBottomTab} onTabChange={setActiveBottomTab} accentColor={theme.accent} />
 
-      {/* Day complete celebration pop */}
-      <AnimatePresence>
-        {showCelebration && (
-          <motion.div
-            className="fixed inset-0 z-[90] flex items-center justify-center pointer-events-none"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="rounded-4xl p-10 text-center shadow-2xl"
-              style={{ background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentDark})` }}
-              initial={{ scale: 0.5, rotate: -8 }}
-              animate={{ scale: 1,   rotate: 0  }}
-              exit={{ scale: 1.1, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            >
-              {streak > 1 ? (
-                <>
-                  <div className="text-7xl mb-3">🔥</div>
-                  <p className="text-3xl font-black text-white">{streak}-Day Streak!</p>
-                  <p className="text-white opacity-80 mt-1">Keep it going!</p>
-                </>
-              ) : (
-                <>
-                  <div className="text-7xl mb-3">🎉</div>
-                  <p className="text-3xl font-black text-white">Day 1 Done!</p>
-                  <p className="text-white opacity-80 mt-1">You started. That's everything.</p>
-                </>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Duolingo-style celebration overlay */}
+      {celebrationProps && (
+        <CelebrationOverlay
+          key={celebrationKey}
+          {...celebrationProps}
+          onDismiss={dismissCelebration}
+        />
+      )}
       <DevPanel show={showDevPanel} onToggle={() => setShowDevPanel(v => !v)} onAction={handleDevAction} devUnlocked={devUnlocked} />
 
       {/* Preferences edit modal */}
