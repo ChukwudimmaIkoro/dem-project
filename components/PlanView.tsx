@@ -21,7 +21,7 @@ import { Card } from './Card';
 import {
   Check, Flame, RotateCcw, Utensils, Dumbbell, Brain,
   Sunrise, Sun, Moon, Coffee, Sparkles, Wrench, Settings2,
-  Lock, CheckCircle2, Eye, Circle, Clock, Lightbulb, type LucideIcon,
+  Lock, CheckCircle2, Eye, Circle, Clock, Lightbulb, CalendarDays, Trophy, type LucideIcon,
 } from 'lucide-react';
 import { CelebrationOverlay } from './CelebrationOverlay';
 import { useCelebration } from '@/hooks/useCelebration';
@@ -38,6 +38,33 @@ import { useDragScroll } from '@/hooks/useDragScroll';
 import MascotTutorial from './MascotTutorial';
 import { TUTORIALS } from '@/lib/tutorials';
 import { useTutorial, clearTutorialsSeen } from '@/hooks/useTutorial';
+
+// ─── Mascot message pools ────────────────────────────────────────────────────────
+
+const TICKLE_MESSAGES = [
+  "That tickles! Hehe!",
+  "Quit it! I'm not your toy!",
+  "Hey, I'm trying to focus here!",
+  "Hehe, stop it!",
+  "Okay okay okay I can't!",
+  "You're the worst... and the best.",
+];
+
+const DIET_AI_MESSAGES = [
+  "Mmm, sounds tasty!",
+  "Ooh, I want some!",
+  "That smells amazing from here!",
+  "Fuel loaded. Let's go!",
+  "Chef's kiss! Great pick.",
+];
+
+const EXERCISE_AI_MESSAGES = [
+  "Time to get swole!",
+  "Let's GOOO!",
+  "Your body will thank you!",
+  "Beast mode: activated.",
+  "Gains incoming!",
+];
 
 // ─── Energy theme tokens ────────────────────────────────────────────────────────
 
@@ -109,6 +136,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const [activePillar,    setActivePillar]    = useState<'diet' | 'exercise' | 'mentality'>('diet');
   const [showEnergyModal, setShowEnergyModal] = useState(false);
   const [energySetMessage, setEnergySetMessage] = useState('');
+  const [tickleMessage,   setTickleMessage]   = useState('');
   const [tabMessage,      setTabMessage]      = useState('');
   const [lastPillar,      setLastPillar]      = useState<'diet' | 'exercise' | 'mentality'>('diet');
   const [userName,        setUserName]        = useState('');
@@ -270,6 +298,18 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       return () => clearTimeout(t);
     }
   }, [activePillar, lastPillar]);
+
+  const handleDietAILoaded = () => {
+    const msg = DIET_AI_MESSAGES[Math.floor(Math.random() * DIET_AI_MESSAGES.length)];
+    setEnergySetMessage(msg);
+    setTimeout(() => setEnergySetMessage(''), 4000);
+  };
+
+  const handleExerciseAILoaded = () => {
+    const msg = EXERCISE_AI_MESSAGES[Math.floor(Math.random() * EXERCISE_AI_MESSAGES.length)];
+    setEnergySetMessage(msg);
+    setTimeout(() => setEnergySetMessage(''), 4000);
+  };
 
   if (!plan) return <div className="p-4 text-center text-gray-400 pt-20">Loading...</div>;
 
@@ -734,7 +774,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                     className="text-xs font-black px-2.5 py-1 rounded-full"
                     style={{ background: theme.accentLight, color: theme.accentText }}
                   >
-                    Plan Complete! 🏆
+                    Plan Complete! <Trophy className="w-3.5 h-3.5 inline ml-0.5 mb-0.5" />
                   </motion.span>
                 )}
               </div>
@@ -774,7 +814,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                   className="rounded-2xl px-4 py-3 text-center"
                   style={{ background: '#f9fafb', border: '2px solid #e5e7eb' }}
                 >
-                  <div className="text-2xl mb-1">🔒</div>
+                  <Lock className="w-8 h-8 mx-auto mb-1 text-gray-400" />
                   <p className="text-sm font-black text-gray-600">Complete your first 3-day streak to unlock longer goals!</p>
                   <p className="text-xs text-gray-400 mt-1">
                     {plan.days.filter(d => isDayComplete(d)).length} / 3 days done
@@ -955,12 +995,17 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
             const dotColor       = (!done && isPast) ? '#ffffff' : ENERGY_CONFIG[day.energyLevel].color;
             const dotBorderColor = (!done && isPast) ? '#d1d5db' : 'white';
             const numDays        = plan.days.length;
+            // Scale falls off with distance from selected day — visual depth effect
+            const dist           = Math.abs(idx - currentDayIndex);
+            const navScale       = dist === 0 ? 1 : dist === 1 ? 0.92 : 0.84;
             return (
               <motion.button
                 key={idx}
                 onClick={() => handleDayChange(idx)}
                 disabled={isFuture}
                 className="relative rounded-2xl py-3 flex flex-col items-center gap-1 flex-shrink-0"
+                animate={{ scale: navScale }}
+                transition={{ type: 'spring', stiffness: 380, damping: 28 }}
                 style={{
                   // ≤7 days: flex-1 fills row evenly; 8+ days: fixed width for horizontal scroll
                   width:  numDays > 7 ? 60 : undefined,
@@ -974,8 +1019,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                     : `0 2px 0 0 #d1d5db`,
                   opacity: isFuture ? 0.4 : 1,
                 }}
-                whileTap={isFuture ? {} : { scale: 0.95, y: 2 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                whileTap={isFuture ? {} : { scale: navScale * 0.95, y: 2 }}
               >
                 {done ? (
                   <Check className="w-5 h-5" style={{ color: isCurrent ? 'white' : theme.accentDark }} />
@@ -1016,7 +1060,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
               style={{ background: 'linear-gradient(135deg, #6b7280, #4b5563)' }}
             >
               <div className="p-4 text-center text-white">
-                <div className="text-3xl mb-1">📅</div>
+                <CalendarDays className="w-8 h-8 mx-auto mb-1 text-white" />
                 <p className="font-black text-lg">Day {currentDay.dayNumber} Has Passed</p>
                 <p className="text-sm opacity-85">This day is view-only. Skipped days don't count toward your streak.</p>
               </div>
@@ -1048,7 +1092,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
               style={{ background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentDark})` }}
             >
               <div className="p-4 text-center text-white">
-                <div className="text-3xl mb-1">🎉</div>
+                <Sparkles className="w-8 h-8 mx-auto mb-1 text-white" />
                 <p className="font-black text-lg">Day {currentDay.dayNumber} Complete!</p>
                 <p className="text-sm opacity-85">You're absolutely crushing it!</p>
               </div>
@@ -1056,17 +1100,25 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
           )}
         </AnimatePresence>
 
-        {/* Mascot — clickable to open energy modal */}
+        {/* Mascot — clickable to open energy modal, or tickle when day is complete */}
         <motion.div
           className="flex justify-center mb-4 cursor-pointer"
-          onClick={() => { if (!isPastDay && !(currentDay.energyLocked ?? false)) setShowEnergyModal(true); }}
+          onClick={() => {
+            if (isComplete) {
+              const msg = TICKLE_MESSAGES[Math.floor(Math.random() * TICKLE_MESSAGES.length)];
+              setTickleMessage(msg);
+              setTimeout(() => setTickleMessage(''), 3000);
+            } else if (!isPastDay && !(currentDay.energyLocked ?? false)) {
+              setShowEnergyModal(true);
+            }
+          }}
           whileHover={{ scale: isPastDay ? 1 : 1.03 }}
           whileTap={{ scale: isPastDay ? 1 : 0.97 }}
-          title={isPastDay ? 'Past day — view only' : (currentDay.energyLocked ?? false) ? 'Day complete, energy locked' : 'Tap to change energy level'}
+          title={isPastDay ? 'Past day — view only' : isComplete ? 'Hehe!' : (currentDay.energyLocked ?? false) ? 'Day complete, energy locked' : 'Tap to change energy level'}
         >
           <Mascot
             key={activePillar}
-            message={energySetMessage || tabMessage}
+            message={tickleMessage || energySetMessage || tabMessage}
             mood={activePillar === 'mentality' ? 'encouraging' : currentDay.energyLevel === 'high' ? 'excited' : 'happy'}
             persistent={false}
             currentEnergy={currentDay.energyLevel}
@@ -1106,6 +1158,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 accentColor={theme.accent}
                 isPastDay={isPastDay}
                 onEditPrefs={() => setEditingPrefs('diet')}
+                onAILoaded={handleDietAILoaded}
               />
             )}
             {activePillar === 'exercise' && (
@@ -1115,6 +1168,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 onToggle={() => toggleTask('exercise')}
                 onEditPrefs={() => setEditingPrefs('exercise')}
                 isPastDay={isPastDay}
+                onAILoaded={handleExerciseAILoaded}
               />
             )}
             {activePillar === 'mentality' && (
@@ -1254,10 +1308,10 @@ function DevPanel({
 
 // ─── Diet view ───────────────────────────────────────────────────────────────────
 
-function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor, onEditPrefs, isPastDay }: {
+function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor, onEditPrefs, isPastDay, onAILoaded }: {
   day: DayPlan; isCompleted: boolean; onToggle: () => void;
   userName?: string; userFoods: string[]; accentColor: string; onEditPrefs: () => void;
-  isPastDay?: boolean;
+  isPastDay?: boolean; onAILoaded?: () => void;
 }) {
   const [meals,   setMeals]   = useState(day.diet.meals);
   const [spinning, setSpinning] = useState<string | null>(null);
@@ -1314,33 +1368,33 @@ function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor
 
       <MealSectionShuffleable title="Breakfast" items={meals.breakfast} Icon={Sunrise}
         mealKey="breakfast" spinning={spinning === 'breakfast'} onShuffle={() => shuffleMeal('breakfast')}
-        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} />
+        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} onAILoaded={onAILoaded} />
       <MealSectionShuffleable title="Lunch" items={meals.lunch} Icon={Sun}
         mealKey="lunch" spinning={spinning === 'lunch'} onShuffle={() => shuffleMeal('lunch')}
-        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} />
+        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} onAILoaded={onAILoaded} />
       <MealSectionShuffleable title="Dinner" items={meals.dinner} Icon={Moon}
         mealKey="dinner" spinning={spinning === 'dinner'} onShuffle={() => shuffleMeal('dinner')}
-        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} />
+        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} onAILoaded={onAILoaded} />
       {meals.snack && meals.snack.length > 0 && (
         <MealSectionShuffleable title="Snack" items={meals.snack} Icon={Coffee}
           mealKey="snack" spinning={spinning === 'snack'} onShuffle={() => shuffleMeal('snack')}
-          dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} />
+          dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} onAILoaded={onAILoaded} />
       )}
     </Card>
   );
 }
 
-function MealSectionShuffleable({ title, items, Icon, mealKey, spinning, onShuffle, dayNumber, energyLevel, userName, isPastDay }: {
+function MealSectionShuffleable({ title, items, Icon, mealKey, spinning, onShuffle, dayNumber, energyLevel, userName, isPastDay, onAILoaded }: {
   title: string; items: string[]; Icon: LucideIcon;
   mealKey: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   spinning: boolean; onShuffle: () => void;
-  isPastDay?: boolean;
+  isPastDay?: boolean; onAILoaded?: () => void;
   dayNumber: number; energyLevel: EnergyLevel; userName?: string;
 }) {
   return (
     <div className="mb-3">
       <AIRecipeCard foods={items ?? []} mealType={mealKey}
-        energyLevel={energyLevel} dayNumber={dayNumber} userName={userName} locked={isPastDay} />
+        energyLevel={energyLevel} dayNumber={dayNumber} userName={userName} locked={isPastDay} onLoaded={onAILoaded} />
       <div className="bg-gray-50 p-3 rounded-2xl">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
@@ -1376,9 +1430,9 @@ function MealSectionShuffleable({ title, items, Icon, mealKey, spinning, onShuff
 
 // ─── Exercise view ───────────────────────────────────────────────────────────────
 
-function ExerciseView({ day, isCompleted, onToggle, onEditPrefs, isPastDay }: {
+function ExerciseView({ day, isCompleted, onToggle, onEditPrefs, isPastDay, onAILoaded }: {
   day: DayPlan; isCompleted: boolean; onToggle: () => void; onEditPrefs: () => void;
-  isPastDay?: boolean;
+  isPastDay?: boolean; onAILoaded?: () => void;
 }) {
   return (
     <Card>
@@ -1427,6 +1481,7 @@ function ExerciseView({ day, isCompleted, onToggle, onEditPrefs, isPastDay }: {
               intensity={ex.intensity}
               energyLevel={day.energyLevel}
               locked={isPastDay}
+              onLoaded={onAILoaded}
             />
           </div>
         ))}

@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Trophy, Flame, Star, CheckCircle2, Zap } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { CelebrationOverlayProps, CelebrationState } from '@/hooks/useCelebration';
+import Mascot from './Mascot';
 import styles from '@/styles/celebration.module.css';
 
 // ─── All tunable values in one place ─────────────────────────────────────────
@@ -37,33 +38,24 @@ export function CelebrationOverlay({ state, onDismiss }: CelebrationOverlayProps
   const [isExiting, setIsExiting] = useState(false);
   const continueBtnRef = useRef<HTMLButtonElement>(null);
 
-  const isMilestone    = state.type === 'streak_milestone';
-  const config         = CELEBRATION_CONFIG[state.type];
-  const headline       = isMilestone
-    ? `${(state as Extract<CelebrationState, { type: 'streak_milestone' }>).streakCount}-Day Streak!`
-    : 'All done for today!';
-  const subtext        = isMilestone
-    ? "You're on fire. Don't stop now."
-    : 'You crushed your list. See you tomorrow.';
-  const streakCount    = isMilestone
-    ? (state as Extract<CelebrationState, { type: 'streak_milestone' }>).streakCount
-    : 0;
-  const nextMilestone  = isMilestone
-    ? (state as Extract<CelebrationState, { type: 'streak_milestone' }>).nextMilestone
-    : 1;
-  const progressPct    = isMilestone
-    ? Math.min(100, Math.round((streakCount / nextMilestone) * 100))
+  const isMilestone   = state.type === 'streak_milestone';
+  const config        = CELEBRATION_CONFIG[state.type];
+  const milestoneState = isMilestone
+    ? (state as Extract<CelebrationState, { type: 'streak_milestone' }>)
+    : null;
+
+  const headline   = isMilestone ? `${milestoneState!.streakCount}-Day Streak!` : 'All done for today!';
+  const subtext    = isMilestone ? "You're on fire. Don't stop now." : 'You crushed your list. See you tomorrow.';
+  const progressPct = isMilestone
+    ? Math.min(100, Math.round((milestoneState!.streakCount / milestoneState!.nextMilestone) * 100))
     : 0;
 
   const supportIconClasses = [styles.supportIcon0, styles.supportIcon1, styles.supportIcon2];
-  const supportIcons = isMilestone
-    ? [Flame, Flame, Trophy]
-    : [Star, CheckCircle2, Zap];
+  const supportIcons = isMilestone ? [Flame, Flame, Trophy] : [Star, CheckCircle2, Zap];
 
   useEffect(() => {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    // Fire confetti — one-shot setTimeout is acceptable here per spec
     const confettiTimer = setTimeout(() => {
       if (!reducedMotion) {
         confetti({
@@ -78,7 +70,6 @@ export function CelebrationOverlay({ state, onDismiss }: CelebrationOverlayProps
       }
     }, CELEBRATION_CONFIG.timing.confettiDelayMs);
 
-    // Auto-focus Continue button — one-shot setTimeout for focus management only
     const focusTimer = setTimeout(() => {
       continueBtnRef.current?.focus();
     }, CELEBRATION_CONFIG.timing.continueButtonDelayMs);
@@ -100,41 +91,48 @@ export function CelebrationOverlay({ state, onDismiss }: CelebrationOverlayProps
       role="dialog"
       aria-modal="true"
       aria-label={headline}
-      className={`fixed inset-0 z-[200] flex items-center justify-center p-6 ${isExiting ? styles.overlayExit : styles.backdrop}`}
+      className={`fixed inset-0 z-[200] flex flex-col items-center justify-center px-6 gap-0 ${isExiting ? styles.overlayExit : styles.backdrop}`}
       style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
     >
-      <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl flex flex-col items-center gap-5">
+      {/* Mascot — says the subtext, floats above the card like MascotTutorial */}
+      <div className={styles.iconPop}>
+        <Mascot
+          message={subtext}
+          mood={isMilestone ? 'excited' : 'happy'}
+          currentEnergy={isMilestone ? 'high' : 'medium'}
+          persistent
+          size={110}
+        />
+      </div>
+
+      {/* Card */}
+      <div className="bg-white rounded-3xl px-7 py-6 max-w-sm w-full shadow-2xl flex flex-col items-center gap-4 mt-2">
 
         {/* Central icon */}
         <div
-          className={`w-20 h-20 rounded-full flex items-center justify-center ${styles.iconPop}`}
+          className={`w-16 h-16 rounded-full flex items-center justify-center ${styles.iconPop}`}
           style={{ background: `${config.accentColor}1a` }}
         >
           {isMilestone ? (
-            <Flame className={`w-10 h-10 ${styles.flamePulse}`} style={{ color: config.accentColor }} />
+            <Flame className={`w-9 h-9 ${styles.flamePulse}`} style={{ color: config.accentColor }} />
           ) : (
-            <Trophy className="w-10 h-10" style={{ color: config.accentColor }} />
+            <Trophy className="w-9 h-9" style={{ color: config.accentColor }} />
           )}
         </div>
 
         {/* Headline */}
-        <div role="status" aria-live="polite" className="text-center">
-          <h2 className={`text-2xl font-black text-gray-900 ${styles.slideUp}`}>
+        <div role="status" aria-live="polite">
+          <h2 className={`text-2xl font-black text-gray-900 text-center ${styles.slideUp}`}>
             {headline}
           </h2>
         </div>
-
-        {/* Subtext */}
-        <p className={`text-gray-500 text-sm text-center -mt-2 ${styles.subtext}`}>
-          {subtext}
-        </p>
 
         {/* Supporting icons */}
         <div className="flex gap-3">
           {supportIcons.map((Icon, i) => (
             <div
               key={i}
-              className={`w-11 h-11 rounded-2xl flex items-center justify-center ${supportIconClasses[i]}`}
+              className={`w-10 h-10 rounded-xl flex items-center justify-center ${supportIconClasses[i]}`}
               style={{ background: `${config.accentColor}18` }}
             >
               <Icon className="w-5 h-5" style={{ color: config.accentColor }} />
@@ -146,8 +144,8 @@ export function CelebrationOverlay({ state, onDismiss }: CelebrationOverlayProps
         {isMilestone && (
           <div className={`w-full ${styles.subtext}`}>
             <div className="flex justify-between text-xs font-bold text-gray-400 mb-1.5">
-              <span>{streakCount} days</span>
-              <span>Next: {nextMilestone} days</span>
+              <span>{milestoneState!.streakCount} days</span>
+              <span>Next: {milestoneState!.nextMilestone} days</span>
             </div>
             <div className="w-full h-3 rounded-full bg-gray-100 overflow-hidden">
               <div
@@ -174,7 +172,6 @@ export function CelebrationOverlay({ state, onDismiss }: CelebrationOverlayProps
         >
           Continue
         </button>
-
       </div>
     </div>
   );

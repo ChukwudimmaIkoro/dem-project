@@ -112,6 +112,7 @@ function SelectionGrid({ items, selected, onToggle }: {
 
 export default function OnboardingFlow({ userName, onComplete }: OnboardingFlowProps) {
   const [step,              setStep]              = useState(1);
+  const [isCreating,        setIsCreating]        = useState(false);
   const [selectedGoals,     setSelectedGoals]     = useState<string[]>([]);
   const [selectedFoods,     setSelectedFoods]     = useState<string[]>([]);
   const [noFoodPref,        setNoFoodPref]        = useState(false);
@@ -177,7 +178,9 @@ export default function OnboardingFlow({ userName, onComplete }: OnboardingFlowP
     // Sync to Supabase immediately (fire and forget)
     syncUserProfile(user).catch(() => {});
     syncPlan(plan).catch(() => {});
-    onComplete();
+    // Show thinking loading screen for 3.5s before entering the app
+    setIsCreating(true);
+    setTimeout(onComplete, 3500);
   };
 
   const hasEnoughFoods     = noFoodPref     || selectedFoods.length >= 10;
@@ -512,6 +515,69 @@ export default function OnboardingFlow({ userName, onComplete }: OnboardingFlowP
           </motion.div>
         )}
 
+      </AnimatePresence>
+
+      {/* Plan creation loading screen */}
+      <AnimatePresence>
+        {isCreating && (
+          <motion.div
+            className="fixed inset-0 z-[300] flex flex-col items-center justify-center overflow-hidden"
+            style={{ background: 'linear-gradient(160deg, #f0fdf4 0%, #eff6ff 100%)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.35 }}
+          >
+            {/* Floating question marks */}
+            {['?', '?', '?', '?', '?'].map((_, i) => (
+              <motion.span
+                key={i}
+                className="absolute text-3xl font-black select-none pointer-events-none"
+                style={{
+                  left:  `${10 + i * 18}%`,
+                  top:   `${20 + (i % 2) * 15}%`,
+                  color: i % 2 === 0 ? '#22c55e' : '#3b82f6',
+                  opacity: 0,
+                }}
+                animate={{ opacity: [0, 0.7, 0], y: [0, -40, -80], rotate: [0, i % 2 === 0 ? 15 : -15, 0] }}
+                transition={{ delay: i * 0.4, duration: 2.0, repeat: Infinity, ease: 'easeOut' }}
+              >
+                ?
+              </motion.span>
+            ))}
+
+            {/* Mascot in thinking mood */}
+            <Mascot
+              mood="thinking"
+              currentEnergy="medium"
+              persistent={false}
+              size={110}
+            />
+
+            {/* Thought bubble trail + bubble */}
+            <div className="flex flex-col items-center mt-3">
+              <div className="flex items-end gap-1.5 mb-1 self-start ml-16">
+                <div className="w-2 h-2 rounded-full bg-gray-300" />
+                <div className="w-2.5 h-2.5 rounded-full bg-gray-300" />
+                <div className="w-3.5 h-3.5 rounded-full bg-gray-300" />
+              </div>
+              <motion.div
+                className="bg-white rounded-3xl px-6 py-4 shadow-xl border-2 border-gray-100 max-w-xs text-center"
+                initial={{ scale: 0.85, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.2, type: 'spring', stiffness: 320, damping: 24 }}
+              >
+                <motion.p
+                  className="text-base font-black text-gray-800"
+                  animate={{ opacity: [1, 0.5, 1] }}
+                  transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                  Creating your plan...
+                </motion.p>
+                <p className="text-xs text-gray-400 mt-1">Personalizing just for you</p>
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
