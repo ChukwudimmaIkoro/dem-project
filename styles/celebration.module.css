@@ -1,0 +1,104 @@
+/* ─── Celebration Overlay Keyframes ─────────────────────────────────────────
+   All @keyframes for CelebrationOverlay live here.
+   Layout/spacing/color stays in Tailwind; animation curves stay here.
+─────────────────────────────────────────────────────────────────────────── */
+
+@keyframes celebrationIconPop {
+  0%   { transform: scale(0);    opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  80%  { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+@keyframes celebrationSlideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes celebrationFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes celebrationFadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes flamePulse {
+  0%   { transform: scale(1);   filter: drop-shadow(0 0 6px #FF6B35); }
+  50%  { transform: scale(1.2); filter: drop-shadow(0 0 18px #FF6B35cc); }
+  100% { transform: scale(1);   filter: drop-shadow(0 0 6px #FF6B35); }
+}
+
+@keyframes streakBarFill {
+  from { width: 0%; }
+  to   { width: var(--streak-progress, 0%); }
+}
+
+/* ─── Applied classes ────────────────────────────────────────────────────── */
+
+.backdrop {
+  animation: celebrationFadeIn 300ms ease-out forwards;
+}
+
+.overlayExit {
+  animation: celebrationFadeOut 250ms ease-in forwards;
+}
+
+.iconPop {
+  animation: celebrationIconPop 500ms cubic-bezier(0.34, 1.56, 0.64, 1) 200ms both;
+}
+
+.flamePulse {
+  animation: flamePulse 1.4s ease-in-out infinite;
+}
+
+.slideUp {
+  animation: celebrationSlideUp 400ms ease-out 400ms both;
+}
+
+.subtext {
+  animation: celebrationFadeIn 400ms ease-out 550ms both;
+}
+
+.supportIcon0 {
+  animation: celebrationSlideUp 350ms cubic-bezier(0.34, 1.56, 0.64, 1) 700ms both;
+}
+
+.supportIcon1 {
+  animation: celebrationSlideUp 350ms cubic-bezier(0.34, 1.56, 0.64, 1) 780ms both;
+}
+
+.supportIcon2 {
+  animation: celebrationSlideUp 350ms cubic-bezier(0.34, 1.56, 0.64, 1) 860ms both;
+}
+
+.streakBar {
+  animation: streakBarFill 800ms ease-out 900ms both;
+}
+
+.continueBtn {
+  animation: celebrationFadeIn 300ms ease-out 1200ms both;
+}
+
+/* ─── Reduced motion ─────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .overlayExit,
+  .iconPop,
+  .flamePulse,
+  .slideUp,
+  .subtext,
+  .supportIcon0,
+  .supportIcon1,
+  .supportIcon2,
+  .streakBar,
+  .continueBtn {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    width: var(--streak-progress, 0%); /* streakBar needs this when animation is off */
+  }
+}
