@@ -12,6 +12,7 @@ interface AIRecipeCardProps {
   dayNumber: number;
   userName?: string;
   locked?: boolean;
+  onLoaded?: () => void;
 }
 
 const MEAL_META: Record<string, { label: string; Icon: LucideIcon; bg: string; border: string; textColor: string }> = {
@@ -27,7 +28,7 @@ const ENERGY_ACCENT: Record<string, { color: string; shadow: string }> = {
   low:    { color: '#3b82f6', shadow: '#1d4ed8' },
 };
 
-export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, userName, locked }: AIRecipeCardProps) {
+export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, userName, locked, onLoaded }: AIRecipeCardProps) {
   const [recipe, setRecipe]   = useState<CachedRecipe | null>(null);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -56,6 +57,7 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
         setRecipe(data.recipe);
         setCachedRecipe(dayNumber, mealType, data.recipe);
         setExpanded(true);
+        onLoaded?.();
       } else {
         setError('Could not generate recipe. Try again.');
       }

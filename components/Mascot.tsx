@@ -7,7 +7,7 @@ import { motion, useAnimationControls, AnimatePresence } from 'framer-motion';
 
 interface MascotProps {
   message?: string;
-  mood?: 'happy' | 'excited' | 'calm' | 'encouraging';
+  mood?: 'happy' | 'excited' | 'calm' | 'encouraging' | 'thinking';
   className?: string;
   persistent?: boolean;
   currentEnergy?: 'low' | 'medium' | 'high';
@@ -423,16 +423,28 @@ export default function Mascot({
                 {/* Eye whites */}
                 <ellipse cx="34" cy="44" rx="5.5" ry="6.5" fill="white" />
                 <ellipse cx="66" cy="44" rx="5.5" ry="6.5" fill="white" />
-                {/* Pupils */}
-                <circle cx="35.5" cy="45.5" r="3.8" fill="#1a1a2e" />
-                <circle cx="67.5" cy="45.5" r="3.8" fill="#1a1a2e" />
-                {/* Eye shines */}
-                <circle cx="37.5" cy="43.5" r="1.4" fill="white" opacity="0.9" />
-                <circle cx="69.5" cy="43.5" r="1.4" fill="white" opacity="0.9" />
+                {/* Pupils — thinking: shifted to upper-right corner */}
+                {mood === 'thinking' ? (
+                  <>
+                    <circle cx="38" cy="42" r="3.8" fill="#1a1a2e" />
+                    <circle cx="70" cy="42" r="3.8" fill="#1a1a2e" />
+                    <circle cx="40" cy="40" r="1.4" fill="white" opacity="0.9" />
+                    <circle cx="72" cy="40" r="1.4" fill="white" opacity="0.9" />
+                  </>
+                ) : (
+                  <>
+                    <circle cx="35.5" cy="45.5" r="3.8" fill="#1a1a2e" />
+                    <circle cx="67.5" cy="45.5" r="3.8" fill="#1a1a2e" />
+                    <circle cx="37.5" cy="43.5" r="1.4" fill="white" opacity="0.9" />
+                    <circle cx="69.5" cy="43.5" r="1.4" fill="white" opacity="0.9" />
+                  </>
+                )}
 
                 {/* Mouth */}
                 {isTalking ? (
                   <ellipse cx="50" cy="62" rx="9" ry="7.5" fill="#1a1a2e" />
+                ) : mood === 'thinking' ? (
+                  <ellipse cx="50" cy="63" rx="5.5" ry="5" fill="#1a1a2e" />
                 ) : mood === 'excited' ? (
                   <path d="M 37 57 Q 50 70 63 57"
                     stroke="#1a1a2e" strokeWidth="2.5" strokeLinecap="round" fill="none" />

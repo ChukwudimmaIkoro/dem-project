@@ -12,6 +12,7 @@ interface AIExerciseCoachProps {
   intensity: string;
   energyLevel: 'low' | 'medium' | 'high';
   locked?: boolean;
+  onLoaded?: () => void;
 }
 
 const ENERGY_ACCENT: Record<string, { color: string; shadow: string }> = {
@@ -21,7 +22,7 @@ const ENERGY_ACCENT: Record<string, { color: string; shadow: string }> = {
 };
 
 export default function AIExerciseCoach({
-  exerciseId, exerciseName, description, intensity, energyLevel, locked,
+  exerciseId, exerciseName, description, intensity, energyLevel, locked, onLoaded,
 }: AIExerciseCoachProps) {
   const [coaching, setCoaching] = useState<CachedExerciseCoach | null>(null);
   const [loading, setLoading]   = useState(false);
@@ -50,6 +51,7 @@ export default function AIExerciseCoach({
         setCoaching(data.coaching);
         setCachedExerciseCoach(exerciseId, energyLevel, data.coaching);
         setExpanded(true);
+        onLoaded?.();
       } else {
         setError('Could not load coaching tips. Try again.');
       }
