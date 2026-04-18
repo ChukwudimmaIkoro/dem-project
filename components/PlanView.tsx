@@ -43,11 +43,9 @@ import { useTutorial, clearTutorialsSeen } from '@/hooks/useTutorial';
 
 const TICKLE_MESSAGES = [
   "That tickles! Hehe!",
-  "Quit it! I'm not your toy!",
   "Hey, I'm trying to focus here!",
   "Hehe, stop it!",
   "Okay okay okay I can't!",
-  "You're the worst... and the best.",
 ];
 
 const DIET_AI_MESSAGES = [

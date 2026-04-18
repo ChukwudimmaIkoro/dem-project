@@ -554,11 +554,18 @@ export default function OnboardingFlow({ userName, onComplete }: OnboardingFlowP
             />
 
             {/* Thought bubble trail + bubble */}
-            <div className="flex flex-col items-center mt-3">
-              <div className="flex items-end gap-1.5 mb-1 self-start ml-16">
-                <div className="w-2 h-2 rounded-full bg-gray-300" />
-                <div className="w-2.5 h-2.5 rounded-full bg-gray-300" />
-                <div className="w-3.5 h-3.5 rounded-full bg-gray-300" />
+            <div className="flex flex-col items-center mt-2">
+              {/* Pulsing loading dots — staggered wave */}
+              <div className="flex items-center gap-2 mb-3">
+                {[0, 1, 2].map(i => (
+                  <motion.div
+                    key={i}
+                    className="rounded-full bg-gray-300"
+                    style={{ width: 8 + i * 3, height: 8 + i * 3 }}
+                    animate={{ scale: [1, 1.5, 1], opacity: [0.35, 1, 0.35] }}
+                    transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.22, ease: 'easeInOut' }}
+                  />
+                ))}
               </div>
               <motion.div
                 className="bg-white rounded-3xl px-6 py-4 shadow-xl border-2 border-gray-100 max-w-xs text-center"
@@ -566,13 +573,7 @@ export default function OnboardingFlow({ userName, onComplete }: OnboardingFlowP
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.2, type: 'spring', stiffness: 320, damping: 24 }}
               >
-                <motion.p
-                  className="text-base font-black text-gray-800"
-                  animate={{ opacity: [1, 0.5, 1] }}
-                  transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-                >
-                  Creating your plan...
-                </motion.p>
+                <p className="text-base font-black text-gray-800">Creating your plan...</p>
                 <p className="text-xs text-gray-400 mt-1">Personalizing just for you</p>
               </motion.div>
             </div>
