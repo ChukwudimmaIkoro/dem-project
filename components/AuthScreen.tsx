@@ -272,7 +272,11 @@ export default function AuthScreen({ onAuth }: AuthScreenProps) {
 
         {mode === 'signup' && (
           <p className="text-[11px] text-gray-400 text-center mt-4 leading-relaxed">
-            No data is shared with third parties. Your progress syncs across devices.
+            By signing up you agree to our{' '}
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">Terms of Service</a>
+            {' '}and{' '}
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">Privacy Policy</a>.
+            No data is shared with third parties.
           </p>
         )}
       </motion.div>
