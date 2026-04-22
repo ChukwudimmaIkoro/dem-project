@@ -9,8 +9,9 @@ import { restoreTutorialsSeen } from '@/hooks/useTutorial';
 import AuthScreen from '@/components/AuthScreen';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import PlanView from '@/components/PlanView';
+import WaitlistLanding from '@/components/WaitlistLanding';
 
-type Screen = 'loading' | 'auth' | 'onboarding' | 'app';
+type Screen = 'loading' | 'landing' | 'auth' | 'onboarding' | 'app';
 
 function LoadingScreen() {
   return (
@@ -56,8 +57,7 @@ export default function Home() {
     setScreen(cloudPlan ? 'app' : 'onboarding');
   }, []);
 
-  useEffect(() => {
-    // Check existing session on mount
+  const initAuth = useCallback(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
         bootstrap(data.user);
@@ -65,9 +65,26 @@ export default function Home() {
         setScreen('auth');
       }
     });
+  }, [bootstrap]);
+
+  const handleContinueToAlpha = useCallback(() => {
+    localStorage.setItem('dem-skip-landing', 'true');
+    setScreen('loading');
+    initAuth();
+  }, [initAuth]);
+
+  useEffect(() => {
+    // Show landing page until user explicitly continues to the app
+    if (!localStorage.getItem('dem-skip-landing')) {
+      setScreen('landing');
+      return;
+    }
+
+    // Check existing session on mount
+    initAuth();
 
     // Only handle explicit sign-in / sign-out events — not INITIAL_SESSION
-    // (getUser() above already handles the session-restore case)
+    // (initAuth() above already handles the session-restore case)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         bootstrap(session.user);
@@ -79,9 +96,11 @@ export default function Home() {
     });
 
     return () => subscription.unsubscribe();
-  }, [bootstrap]);
+  }, [bootstrap, initAuth]);
 
   if (screen === 'loading') return <LoadingScreen />;
+
+  if (screen === 'landing') return <WaitlistLanding onContinueToAlpha={handleContinueToAlpha} />;
 
   if (screen === 'auth') {
     return <AuthScreen onAuth={user => bootstrap(user)} />;
