@@ -50,7 +50,6 @@ Use 4-7 ingredients. Quantities must be realistic (e.g. '2 cups', '1 tbsp', '3 o
     });
 
     const rawText = message.content[0].type === 'text' ? message.content[0].text.trim() : '';
-    // Extract JSON object robustly — handles any prose Claude adds before/after
     const start = rawText.indexOf('{');
     const end   = rawText.lastIndexOf('}');
     if (start === -1 || end === -1) throw new Error('No JSON in response');

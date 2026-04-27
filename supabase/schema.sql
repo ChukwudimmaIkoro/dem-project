@@ -1,9 +1,6 @@
--- ============================================================
--- Dem App — Supabase Schema
--- Paste this entire file into: Supabase → SQL Editor → New query → Run
--- ============================================================
+-- Dem App - Supabase Schema
 
--- ── User profiles (extends auth.users) ────────────────────────────────────────
+-- User profiles (extends auth.users)
 
 CREATE TABLE IF NOT EXISTS user_profiles (
   id                      UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
@@ -36,7 +33,7 @@ CREATE POLICY "Users can update own profile"
   ON user_profiles FOR UPDATE
   USING (auth.uid() = id);
 
--- ── Plans (stored as JSONB for flexibility) ───────────────────────────────────
+-- Plans (stored as JSONB)
 
 CREATE TABLE IF NOT EXISTS user_plans (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -63,7 +60,7 @@ CREATE POLICY "Users can update own plans"
   ON user_plans FOR UPDATE
   USING (auth.uid() = user_id);
 
--- ── AI cache ──────────────────────────────────────────────────────────────────
+-- AI cache
 
 CREATE TABLE IF NOT EXISTS ai_cache (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -95,8 +92,7 @@ CREATE POLICY "Users can delete own cache"
   ON ai_cache FOR DELETE
   USING (auth.uid() = user_id);
 
--- ── Auto-create profile row on sign-up ────────────────────────────────────────
--- This trigger fires when a new user signs up so user_profiles always has a row.
+-- Auto-create profile row on sign-up
 
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$

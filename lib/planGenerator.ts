@@ -11,28 +11,20 @@ import { getFoodsByIds, FOODS } from './foods';
 import { EXERCISES, getExercisesByIntensity, getExercisesByIds } from './exercises';
 import { MENTALITY_CHECKS, getRandomMentalityCheck, getMentalityCheckByType } from './mentality';
 
-/**
- * ENERGY SCALING LOGIC
- * This is the differentiator feature
- */
-
-// Map energy level to exercise intensity
+// Maps energy level to exercise intensity
 const ENERGY_TO_INTENSITY = {
   low: 'light' as const,
   medium: 'moderate' as const,
   high: 'intense' as const,
 };
 
-// Map energy level to meal complexity
+// Maps energy level to meal complexity
 const ENERGY_TO_MEAL_STYLE = {
   low: 'simple', // Quick, easy meals
   medium: 'balanced', // Normal meal prep
   high: 'optimal', // Full macro-optimized meals
 };
 
-/**
- * Generate diet plan based on user's food preferences and energy level
- */
 function generateDietPlan(userFoods: string[], energyLevel: EnergyLevel, dayNumber: number): DietPlan {
   // Empty selectedFoods = "no preference" mode — use the full food database
   const selectedFoods = userFoods.length > 0 ? getFoodsByIds(userFoods) : FOODS;
@@ -103,9 +95,6 @@ function generateDietPlan(userFoods: string[], energyLevel: EnergyLevel, dayNumb
   };
 }
 
-/**
- * Generate exercise plan based on energy level and user preferences
- */
 function generateExercisePlan(energyLevel: EnergyLevel, dayNumber: number, userExercises: string[]): ExercisePlan {
   const intensity = ENERGY_TO_INTENSITY[energyLevel];
 
@@ -141,9 +130,6 @@ function generateExercisePlan(energyLevel: EnergyLevel, dayNumber: number, userE
   };
 }
 
-/**
- * Generate mentality check based on user preferences
- */
 function generateMentalityPlan(dayNumber: number, userMentality: string[]): MentalityPlan {
   if (userMentality.length === 0) {
     // No preference — rotate through affirmation/breathing/reflection by day
@@ -163,9 +149,6 @@ function generateMentalityPlan(dayNumber: number, userMentality: string[]): Ment
   return { check };
 }
 
-/**
- * MAIN FUNCTION: Generate a plan of any supported length
- */
 export function generatePlan(
   user: UserProfile,
   planLength: 3 | 5 | 7 | 14 | 30 = 3,
@@ -203,9 +186,6 @@ export function generatePlan(
   };
 }
 
-/**
- * Backward-compatible alias for 3-day plan generation
- */
 export function generateThreeDayPlan(
   user: UserProfile,
   energyLevels?: EnergyLevel[],
@@ -213,10 +193,7 @@ export function generateThreeDayPlan(
   return generatePlan(user, 3, energyLevels);
 }
 
-/**
- * Regenerate only the diet + exercise for one day when energy changes.
- * Preserves all other day state (completed, mentality, energyLocked).
- */
+// Regenerates diet + exercise for one day when energy changes. Preserves completed state, mentality, and energyLocked.
 export function regenerateDayForEnergy(
   plan: ThreeDayPlan,
   dayIdx: number,
@@ -234,10 +211,7 @@ export function regenerateDayForEnergy(
   return updated;
 }
 
-/**
- * Return the 0-based index of the currently active day based on real calendar time.
- * Compares calendar days (ignores time-of-day). Clamps to [0, days.length - 1].
- */
+// Returns 0-based index of the active day based on calendar date. Clamps to plan length.
 export function getActiveDayIndex(plan: ThreeDayPlan): number {
   const startStr = plan.startDate ?? plan.createdAt;
   const start    = new Date(startStr);
@@ -249,30 +223,15 @@ export function getActiveDayIndex(plan: ThreeDayPlan): number {
   return Math.min(Math.max(0, diff), plan.days.length - 1);
 }
 
-/**
- * Shuffle meals for a single day — reuses same pool/energy, just re-randomizes picks.
- * Called when the user clicks the dice icon.
- */
 export function shuffleDietMeals(userFoods: string[], energyLevel: EnergyLevel, dayNumber: number): DietPlan {
   return generateDietPlan(userFoods, energyLevel, dayNumber);
 }
 
-/**
- * Check if a day is fully completed
- */
 export function isDayComplete(day: DayPlan): boolean {
   return day.completed.diet && day.completed.exercise && day.completed.mentality;
 }
 
-/**
- * Calculate current streak.
- * Counts backward from the most recently relevant day so a gray (missed) day
- * breaks the chain but completing later days rebuilds the streak from scratch.
- *
- * - If the active day is done, count backward from it (inclusive).
- * - If the active day is still in progress, count backward from the previous day.
- * - A missed (gray) day encountered while counting backward stops the count.
- */
+// Counts backward from the active day. Stops at the first missed day.
 export function calculateStreak(plan: ThreeDayPlan, activeDayIdx?: number): number {
   const activeIdx = activeDayIdx ?? (plan.days.length - 1);
   if (activeIdx < 0 || activeIdx >= plan.days.length) return 0;

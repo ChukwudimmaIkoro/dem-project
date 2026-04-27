@@ -1,7 +1,4 @@
-/* ─── Celebration Overlay Keyframes ─────────────────────────────────────────
-   All @keyframes for CelebrationOverlay live here.
-   Layout/spacing/color stays in Tailwind; animation curves stay here.
-─────────────────────────────────────────────────────────────────────────── */
+/* Keyframes for CelebrationOverlay. Layout stays in Tailwind; animation curves live here. */
 
 @keyframes celebrationIconPop {
   0%   { transform: scale(0);    opacity: 0; }
@@ -36,7 +33,7 @@
   to   { width: var(--streak-progress, 0%); }
 }
 
-/* ─── Applied classes ────────────────────────────────────────────────────── */
+/* Applied classes */
 
 .backdrop {
   animation: celebrationFadeIn 300ms ease-out forwards;
@@ -82,7 +79,7 @@
   animation: celebrationFadeIn 300ms ease-out 1200ms both;
 }
 
-/* ─── Reduced motion ─────────────────────────────────────────────────────── */
+/* Reduced motion */
 
 @media (prefers-reduced-motion: reduce) {
   .backdrop,

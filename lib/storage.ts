@@ -109,7 +109,6 @@ function loadAICache(): AICache {
     const stored = localStorage.getItem(AI_CACHE_KEY);
     if (!stored) return getEmptyCache();
     const cache: AICache = JSON.parse(stored);
-    // Invalidate cache if it belongs to a different plan
     const currentPlanId = loadAppState().currentPlan?.id ?? '';
     if (cache.planId !== currentPlanId) {
       localStorage.removeItem(AI_CACHE_KEY);
@@ -161,6 +160,5 @@ export function clearAppState(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(ENERGY_MODAL_KEY);
-  // AI cache is intentionally preserved — it's validated by planId on load,
-  // so if the same plan reloads after sign-in, cached recipes are still available.
+  // AI cache preserved intentionally — validated by planId on load
 }

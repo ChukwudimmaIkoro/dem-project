@@ -1,8 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
-// Uses the service role key — never exposed to the browser.
-// Add SUPABASE_SERVICE_ROLE_KEY to your Vercel env vars (Settings → Environment Variables).
+// Service role client — server-side only, never sent to the browser
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -14,7 +13,6 @@ export async function POST(req: NextRequest) {
 
   const token = authHeader.replace('Bearer ', '');
 
-  // Verify the token is valid before deleting
   const { data: { user }, error: verifyError } = await supabaseAdmin.auth.getUser(token);
   if (verifyError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 

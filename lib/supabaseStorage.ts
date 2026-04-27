@@ -1,8 +1,4 @@
-/**
- * Supabase-backed storage layer.
- * Same function signatures as lib/storage.ts — swap in when user is authenticated.
- * Unauthenticated users always fall back to localStorage via storage.ts.
- */
+// Supabase storage layer. Mirrors lib/storage.ts interface for authenticated users.
 
 import { supabase } from './supabase';
 import { UserProfile, ThreeDayPlan } from '@/types';
@@ -12,7 +8,7 @@ import {
   saveCurrentPlan as lsSaveCurrentPlan,
 } from './storage';
 
-// ─── User profile ─────────────────────────────────────────────────────────────
+// User profile
 
 export async function syncUserProfile(user: UserProfile): Promise<void> {
   const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -62,7 +58,7 @@ export async function loadUserProfile(): Promise<UserProfile | null> {
   };
 }
 
-// ─── Plan ─────────────────────────────────────────────────────────────────────
+// Plan
 
 export async function syncPlan(plan: ThreeDayPlan): Promise<void> {
   const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -113,7 +109,7 @@ export async function loadActivePlan(): Promise<ThreeDayPlan | null> {
   return data ? (data.plan_data as ThreeDayPlan) : null;
 }
 
-// ─── AI cache ─────────────────────────────────────────────────────────────────
+// AI cache
 
 async function getAuthUserId(): Promise<string | null> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -170,13 +166,7 @@ export async function setCloudCachedExercise(exerciseId: string, energyLevel: st
   return setCachedValue(`exercise-${exerciseId}-${energyLevel}`, coaching);
 }
 
-// ─── Migration: localStorage → Supabase ──────────────────────────────────────
-
-/**
- * Called once on sign-up or sign-in when local data exists.
- * Pushes whatever is in localStorage up to Supabase so the user
- * doesn't lose their onboarding data when they create an account.
- */
+// Migration: push localStorage data to Supabase on first sign-in
 export async function migrateLocalDataToSupabase(
   localUser: UserProfile,
   localPlan: ThreeDayPlan,
