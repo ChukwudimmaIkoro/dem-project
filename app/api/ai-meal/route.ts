@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
     const prompt = `You are a culinary expert and nutritionist. Your task is to create a high-quality ${mealType} recipe.
 
-Before generating, think about what a well-tested, highly-rated recipe using these ingredients looks like — authentic techniques, realistic quantities, and clear actionable steps — then produce a recipe of equivalent quality and reliability.
+Before generating, think about what a well-tested, professional cookbook-quality recipe using these ingredients looks like — authentic techniques, realistic quantities, and clear actionable steps — then produce a recipe of equivalent quality and reliability.
 
 Available ingredients (use as many as fit naturally): ${foods.join(', ')}
 
