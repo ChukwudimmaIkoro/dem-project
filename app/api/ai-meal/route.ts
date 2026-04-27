@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
     const prompt = `You are a culinary expert and nutritionist. Your task is to create a high-quality ${mealType} recipe.
 
-Before generating, mentally draw from popular recipe platforms like AllRecipes, Food Network, Bon Appétit, NYT Cooking, and Serious Eats. Think about what well-tested, highly-rated recipes using these ingredients look like on those sites — their authentic techniques, realistic quantities, and step clarity — then produce a recipe of equivalent quality and reliability.
+Before generating, think about what a well-tested, highly-rated recipe using these ingredients looks like — authentic techniques, realistic quantities, and clear actionable steps — then produce a recipe of equivalent quality and reliability.
 
 Available ingredients (use as many as fit naturally): ${foods.join(', ')}
 
@@ -29,7 +29,7 @@ Produce ONLY this JSON, no other text:
     {"item": "ingredient name", "amount": "realistic quantity with units"}
   ],
   "steps": [
-    "Clear, specific step as you'd find on AllRecipes",
+    "Clear, specific step",
     "Next step",
     "Final step"
   ],

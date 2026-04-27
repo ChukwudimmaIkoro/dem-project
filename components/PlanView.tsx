@@ -1183,7 +1183,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
 
       <BottomNav activeTab={activeBottomTab} onTabChange={setActiveBottomTab} accentColor={theme.accent} />
 
-      {/* Duolingo-style celebration overlay */}
+      {/* Celebration overlay */}
       {celebrationProps && (
         <CelebrationOverlay
           key={celebrationKey}
