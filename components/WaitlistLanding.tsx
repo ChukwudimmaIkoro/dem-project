@@ -154,7 +154,6 @@ export default function WaitlistLanding({ onContinueToAlpha }: WaitlistLandingPr
         </motion.div>
       </div>
 
-      {/* Continue to alpha — bottom */}
       <motion.div
         className="mt-10 text-center"
         initial={{ opacity: 0 }}

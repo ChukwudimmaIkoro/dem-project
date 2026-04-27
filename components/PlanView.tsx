@@ -238,8 +238,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   useEffect(() => {
     if (!plan) return;
 
-    // Raw (unclamped) calendar diff — this is the key: getActiveDayIndex() clamps so
-    // activeDayIdx can never exceed planLength-1, but rawDiff can exceed planLength.
+    // Raw (unclamped) diff so we can detect when the plan has expired (rawDiff >= planLength).
     const startStr  = plan.startDate ?? plan.createdAt;
     const startDate = new Date(startStr);
     const startDay  = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
@@ -327,7 +326,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   // Plan expired = real time has passed last day but plan was never fully completed
   const planExpired     = !allDaysComplete && activeDayIdx >= (plan.planLength ?? 3) - 1 && activeDayIdx > 0;
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // Handlers
 
   const handleEnergySelect = (energy: EnergyLevel) => {
     setShowEnergyModal(false);

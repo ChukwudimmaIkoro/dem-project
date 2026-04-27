@@ -64,8 +64,7 @@ export default function AuthModal({ onClose, onSuccess, accentColor, accentDark 
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
 
-        // Pull cloud data down into localStorage so the app immediately reflects the user's saved state.
-        // This is the key fix for "progress not restored after sign-in".
+        // Pull cloud data into localStorage so the app reflects the user's saved state.
         const [cloudUser, cloudPlan] = await Promise.all([loadUserProfile(), loadActivePlan()]);
         if (cloudUser) saveUserProfile(cloudUser);
         if (cloudPlan) saveCurrentPlan(cloudPlan);
@@ -144,7 +143,6 @@ export default function AuthModal({ onClose, onSuccess, accentColor, accentDark 
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-3">
-            {/* Name — signup only */}
             <AnimatePresence>
               {mode === 'signup' && (
                 <motion.div

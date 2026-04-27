@@ -173,7 +173,6 @@ export default function AuthScreen({ onAuth }: AuthScreenProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          {/* Name — signup only */}
           <AnimatePresence>
             {mode === 'signup' && (
               <motion.div

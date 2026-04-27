@@ -281,7 +281,7 @@ export default function Mascot({
     }
   }, [currentEnergy, wrapperControls]);
 
-  // ── Bounce loop — restarts cleanly when energy changes ──────────────────────
+  // Bounce loop
   useEffect(() => {
     loopActive.current = true;
     energyRef.current  = currentEnergy;
