@@ -21,7 +21,7 @@ import { Card } from './Card';
 import {
   Check, Flame, RotateCcw, Utensils, Dumbbell, Brain,
   Sunrise, Sun, Moon, Coffee, Sparkles, Wrench, Settings2,
-  Lock, CheckCircle2, Eye, Circle, Clock, Lightbulb, CalendarDays, Trophy, type LucideIcon,
+  Lock, CheckCircle2, Eye, Circle, Clock, Lightbulb, CalendarDays, Trophy, ShoppingBasket, X as XIcon, type LucideIcon,
 } from 'lucide-react';
 import { CelebrationOverlay } from './CelebrationOverlay';
 import { useCelebration } from '@/hooks/useCelebration';
@@ -134,7 +134,8 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const [plan,            setPlan]           = useState<ThreeDayPlan | null>(null);
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const { triggerCelebration, celebrationProps, celebrationKey, dismissCelebration } = useCelebration();
-  const [activeBottomTab, setActiveBottomTab] = useState<'plan' | 'account' | 'progress' | 'settings' | 'pantry'>('plan');
+  const [activeBottomTab, setActiveBottomTab] = useState<'plan' | 'account' | 'progress' | 'settings'>('plan');
+  const [showPantrySheet, setShowPantrySheet] = useState(false);
   const [activePillar,    setActivePillar]    = useState<'diet' | 'exercise' | 'mentality'>('diet');
   const [showEnergyModal, setShowEnergyModal] = useState(false);
   const [energySetMessage, setEnergySetMessage] = useState('');
@@ -548,29 +549,6 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     setShowDevPanel(false);
   };
 
-  // ── Pantry tab ────────────────────────────────────────────────────────────
-
-  if (activeBottomTab === 'pantry') {
-    return (
-      <EnergyBackground energy={currentDay.energyLevel}>
-        <div className="min-h-screen overflow-y-auto">
-          <PantryTab
-            accentColor={theme.accent}
-            accentDark={theme.accentDark}
-            accentLight={theme.accentLight}
-            accentText={theme.accentText}
-          />
-          <FloatingMascot
-            energy={currentDay.energyLevel}
-            userName={userName}
-            firstVisitMessage="Add what you have, and I'll cook something up!"
-          />
-          <BottomNav activeTab={activeBottomTab} onTabChange={setActiveBottomTab} accentColor={theme.accent} />
-          <DevPanel show={showDevPanel} onToggle={() => setShowDevPanel(v => !v)} onAction={handleDevAction} devUnlocked={devUnlocked} />
-        </div>
-      </EnergyBackground>
-    );
-  }
 
   // ── Account tab ──────────────────────────────────────────────────────────
 
@@ -1257,6 +1235,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 pantryLunch={getPantryForMeal('lunch')}
                 pantryDinner={getPantryForMeal('dinner')}
                 pantrySnack={getPantryForMeal('snack')}
+                onOpenPantry={() => setShowPantrySheet(true)}
               />
             )}
             {activePillar === 'exercise' && (
@@ -1293,6 +1272,46 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       )}
       <DevPanel show={showDevPanel} onToggle={() => setShowDevPanel(v => !v)} onAction={handleDevAction} devUnlocked={devUnlocked} />
 
+      {/* Pantry sheet — triggered by basket button in DietView header */}
+      <AnimatePresence>
+        {showPantrySheet && (
+          <motion.div
+            className="fixed inset-0 z-[170] flex items-end justify-center"
+            style={{ background: 'rgba(0,0,0,0.55)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowPantrySheet(false)}
+          >
+            <motion.div
+              className="bg-white w-full max-w-md rounded-t-3xl overflow-hidden flex flex-col"
+              style={{ maxHeight: '88vh' }}
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
+                <h2 className="text-lg font-black text-gray-900">🧺 Pantry</h2>
+                <button onClick={() => setShowPantrySheet(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                  <XIcon className="w-4 h-4 text-gray-500" />
+                </button>
+              </div>
+              <div className="overflow-y-auto flex-1">
+                <PantryTab
+                  accentColor={theme.accent}
+                  accentDark={theme.accentDark}
+                  accentLight={theme.accentLight}
+                  accentText={theme.accentText}
+                  inSheet
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Preferences edit modal */}
       <AnimatePresence>
         {editingPrefs && (
@@ -1304,7 +1323,6 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
               const s = loadAppState();
               if (s.user) syncUserProfile(s.user).catch(() => {});
               setPlan(newPlan);
-              setCurrentDayIndex(0);
               setEditingPrefs(null);
             }}
           />
@@ -1462,12 +1480,13 @@ function DevPanel({
 // ─── Diet view ───────────────────────────────────────────────────────────────────
 
 function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor, onEditPrefs, isPastDay, onAILoaded,
-  pantryBreakfast = [], pantryLunch = [], pantryDinner = [], pantrySnack = [],
+  pantryBreakfast = [], pantryLunch = [], pantryDinner = [], pantrySnack = [], onOpenPantry,
 }: {
   day: DayPlan; isCompleted: boolean; onToggle: () => void;
   userName?: string; userFoods: string[]; accentColor: string; onEditPrefs: () => void;
   isPastDay?: boolean; onAILoaded?: () => void;
   pantryBreakfast?: string[]; pantryLunch?: string[]; pantryDinner?: string[]; pantrySnack?: string[];
+  onOpenPantry?: () => void;
 }) {
   const [meals,   setMeals]   = useState(day.diet.meals);
   const [spinning, setSpinning] = useState<string | null>(null);
@@ -1509,17 +1528,27 @@ function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor
           </div>
           <p className="text-sm font-semibold" style={{ color: accentColor }}>{day.diet.focus}</p>
         </div>
-        <motion.button
-          onClick={onToggle}
-          className="w-11 h-11 rounded-xl flex items-center justify-center border-2 transition-colors"
-          style={{
-            background:   isCompleted ? accentColor : 'transparent',
-            borderColor:  isCompleted ? accentColor : '#d1d5db',
-          }}
-          whileTap={{ scale: 0.9 }}
-        >
-          {isCompleted && <Check className="w-5 h-5 text-white" />}
-        </motion.button>
+        <div className="flex items-center gap-2">
+          <motion.button
+            onClick={onOpenPantry}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+            title="Open pantry"
+            whileTap={{ scale: 0.9 }}
+          >
+            <ShoppingBasket className="w-4 h-4" />
+          </motion.button>
+          <motion.button
+            onClick={onToggle}
+            className="w-11 h-11 rounded-xl flex items-center justify-center border-2 transition-colors"
+            style={{
+              background:   isCompleted ? accentColor : 'transparent',
+              borderColor:  isCompleted ? accentColor : '#d1d5db',
+            }}
+            whileTap={{ scale: 0.9 }}
+          >
+            {isCompleted && <Check className="w-5 h-5 text-white" />}
+          </motion.button>
+        </div>
       </div>
 
       <MealSectionShuffleable title="Breakfast" items={meals.breakfast} pantryItems={pantryBreakfast} Icon={Sunrise}

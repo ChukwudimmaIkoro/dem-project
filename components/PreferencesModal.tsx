@@ -107,8 +107,16 @@ export default function PreferencesModal({ pillar, onClose, onSaved }: Preferenc
       plan.planLength ?? 3,
       plan.days.map(d => d.energyLevel),
     );
+    // Preserve all progress — only the plan content (meals/exercises/checks) changes
+    newPlan.startDate        = plan.startDate ?? plan.createdAt;
+    newPlan.carryOverStreak  = plan.carryOverStreak ?? 0;
     newPlan.historicalStreak = plan.historicalStreak ?? 0;
     newPlan.dummyCurrency    = plan.dummyCurrency ?? 0;
+    newPlan.days = newPlan.days.map((day, i) => {
+      const oldDay = plan.days[i];
+      if (!oldDay) return day;
+      return { ...day, completed: oldDay.completed, energyLocked: oldDay.energyLocked };
+    });
     saveCurrentPlan(newPlan);
     onSaved(newPlan);
   };

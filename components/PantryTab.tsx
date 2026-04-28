@@ -18,9 +18,10 @@ interface PantryTabProps {
   accentDark: string;
   accentLight: string;
   accentText: string;
+  inSheet?: boolean;
 }
 
-export default function PantryTab({ accentColor, accentDark, accentLight, accentText }: PantryTabProps) {
+export default function PantryTab({ accentColor, accentDark, accentLight, accentText, inSheet }: PantryTabProps) {
   const [items,      setItems]      = useState<PantryItem[]>([]);
   const [draft,      setDraft]      = useState('');
   const [mealTypes,  setMealTypes]  = useState<MealType[]>([]);
@@ -62,7 +63,7 @@ export default function PantryTab({ accentColor, accentDark, accentLight, accent
   })).filter(g => g.items.length > 0);
 
   return (
-    <div className="pt-8 pb-28 px-4 space-y-4">
+    <div className={`px-4 space-y-4 ${inSheet ? 'pt-4 pb-8' : 'pt-8 pb-28'}`}>
 
       {/* Header */}
       <div>

@@ -65,6 +65,6 @@ export function removePantryItem(id: string): PantryItem[] {
 /** Returns pantry item names that belong to a given meal slot */
 export function getPantryForMeal(mealType: MealType): string[] {
   return loadPantry()
-    .filter(i => i.mealTypes.includes(mealType))
+    .filter(i => (i.mealTypes ?? []).includes(mealType))
     .map(i => i.name);
 }
