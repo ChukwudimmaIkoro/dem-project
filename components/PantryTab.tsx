@@ -59,7 +59,7 @@ export default function PantryTab({ accentColor, accentDark, accentLight, accent
   // Group items by meal type for display
   const grouped = MEAL_LABELS.map(m => ({
     ...m,
-    items: items.filter(i => i.mealTypes.includes(m.id)),
+    items: items.filter(i => (i.mealTypes ?? []).includes(m.id)),
   })).filter(g => g.items.length > 0);
 
   return (

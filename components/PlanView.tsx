@@ -1531,11 +1531,11 @@ function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor
         <div className="flex items-center gap-2">
           <motion.button
             onClick={onOpenPantry}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+            className="w-11 h-11 rounded-xl flex items-center justify-center border-2 border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
             title="Open pantry"
             whileTap={{ scale: 0.9 }}
           >
-            <ShoppingBasket className="w-4 h-4" />
+            <ShoppingBasket className="w-5 h-5" />
           </motion.button>
           <motion.button
             onClick={onToggle}
