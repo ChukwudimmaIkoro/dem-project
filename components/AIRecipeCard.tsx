@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChefHat, Clock, Zap, ChevronDown, Sparkles, Sunrise, Sun, Moon, Coffee, Lightbulb, type LucideIcon } from 'lucide-react';
 import { getCachedRecipe, setCachedRecipe, CachedRecipe } from '@/lib/storage';
+import { hasTreatsLeft, useTreat, getTreatsRemainingToday } from '@/lib/thinkyTreats';
 
 interface AIRecipeCardProps {
   foods: string[];
@@ -33,6 +34,7 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [error, setError]     = useState('');
+  const [treatsLeft, setTreatsLeft] = useState(getTreatsRemainingToday);
 
   const meta   = MEAL_META[mealType];
   const accent = ENERGY_ACCENT[energyLevel];
@@ -44,6 +46,9 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
 
   const handleGenerate = async () => {
     if (locked || foods.length === 0) return;
+    if (!hasTreatsLeft()) return;
+    useTreat();
+    setTreatsLeft(getTreatsRemainingToday());
     setLoading(true);
     setError('');
     try {
@@ -95,48 +100,39 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
         </div>
 
         {!recipe && !locked && (
-          <motion.button
-            onClick={handleGenerate}
-            disabled={loading || foods.length === 0}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white"
-            style={{
-              background:  loading ? '#d1d5db' : accent.color,
-              boxShadow:   loading ? 'none' : `0 4px 0 0 ${accent.shadow}`,
-              cursor:      loading ? 'not-allowed' : 'pointer',
-            }}
-            whileTap={loading ? {} : { scale: 0.95, y: 2, boxShadow: 'none' }}
-            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-          >
-            <AnimatePresence mode="wait">
-              {loading ? (
-                <motion.span
-                  key="loading"
-                  className="flex items-center gap-1.5"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <motion.div
-                    className="w-3 h-3 rounded-full border-2 border-white border-t-transparent"
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 0.75, ease: 'linear' }}
-                  />
-                  Generating...
-                </motion.span>
-              ) : (
-                <motion.span
-                  key="idle"
-                  className="flex items-center gap-1.5"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <Sparkles className="w-3 h-3" />
-                  Suggest meal
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </motion.button>
+          treatsLeft > 0 ? (
+            <motion.button
+              onClick={handleGenerate}
+              disabled={loading || foods.length === 0}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white"
+              style={{
+                background:  loading ? '#d1d5db' : accent.color,
+                boxShadow:   loading ? 'none' : `0 4px 0 0 ${accent.shadow}`,
+                cursor:      loading ? 'not-allowed' : 'pointer',
+              }}
+              whileTap={loading ? {} : { scale: 0.95, y: 2, boxShadow: 'none' }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            >
+              <AnimatePresence mode="wait">
+                {loading ? (
+                  <motion.span key="loading" className="flex items-center gap-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <motion.div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent"
+                      animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.75, ease: 'linear' }} />
+                    Generating...
+                  </motion.span>
+                ) : (
+                  <motion.span key="idle" className="flex items-center gap-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <Sparkles className="w-3 h-3" />
+                    Suggest meal · {treatsLeft} treat{treatsLeft !== 1 ? 's' : ''} left
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.button>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-amber-50 border border-amber-200 text-amber-700">
+              🍬 Out of treats — resets tomorrow
+            </div>
+          )
         )}
 
         {recipe && (

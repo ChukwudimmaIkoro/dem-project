@@ -52,6 +52,8 @@ export interface UserProfile {
   noExercisePreference?: boolean;  // true = skip exercise selection
   noMentalityPreference?: boolean; // true = skip mentality selection
   longestStreak?: number;          // highest streak ever reached — never reset on streak loss
+  demPlusHabit?: string;           // Dem+ single habit the user is building
+  mascotItems?: string[];          // owned mascot cosmetic item IDs
   createdAt: string;
 }
 

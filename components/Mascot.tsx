@@ -18,7 +18,85 @@ interface MascotProps {
   pillar?: 'diet' | 'exercise' | 'mentality';
   size?: number; // SVG rendered size in px (default 96)
   suppressBubble?: boolean; // hide speech bubble entirely (used in tutorial overlay)
+  hat?: string; // hat item ID from MASCOT_HATS
 }
+
+// ─── Hat definitions ─────────────────────────────────────────────────────────────
+
+export interface MascotHat {
+  id: string;
+  name: string;
+  emoji: string;
+  svgPath: React.ReactNode;
+}
+
+export const MASCOT_HATS: MascotHat[] = [
+  {
+    id: 'party',
+    name: 'Party Hat',
+    emoji: '🎉',
+    svgPath: (
+      <g>
+        <polygon points="50,2 30,38 70,38" fill="#f97316" />
+        <polygon points="50,2 38,22 62,22" fill="#fbbf24" />
+        <circle cx="50" cy="2" r="3" fill="#f43f5e" />
+        <ellipse cx="50" cy="38" rx="21" ry="5" fill="#fb923c" />
+      </g>
+    ),
+  },
+  {
+    id: 'crown',
+    name: 'Crown',
+    emoji: '👑',
+    svgPath: (
+      <g>
+        <polygon points="29,38 29,20 38,30 50,10 62,30 71,20 71,38" fill="#fbbf24" stroke="#f59e0b" strokeWidth="1.5" />
+        <circle cx="50" cy="11" r="3.5" fill="#f43f5e" />
+        <circle cx="29" cy="20" r="2.5" fill="#60a5fa" />
+        <circle cx="71" cy="20" r="2.5" fill="#34d399" />
+      </g>
+    ),
+  },
+  {
+    id: 'beanie',
+    name: 'Beanie',
+    emoji: '🧢',
+    svgPath: (
+      <g>
+        <ellipse cx="50" cy="38" rx="22" ry="6" fill="#6366f1" />
+        <path d="M28,38 Q28,10 50,10 Q72,10 72,38" fill="#818cf8" />
+        <circle cx="50" cy="11" r="4" fill="#f43f5e" />
+        <line x1="28" y1="32" x2="72" y2="32" stroke="#4f46e5" strokeWidth="2.5" />
+      </g>
+    ),
+  },
+  {
+    id: 'tophat',
+    name: 'Top Hat',
+    emoji: '🎩',
+    svgPath: (
+      <g>
+        <rect x="34" y="12" width="32" height="26" rx="3" fill="#1e293b" />
+        <rect x="26" y="36" width="48" height="6" rx="3" fill="#334155" />
+        <rect x="38" y="14" width="24" height="4" rx="1" fill="#64748b" opacity="0.4" />
+      </g>
+    ),
+  },
+  {
+    id: 'bow',
+    name: 'Bow',
+    emoji: '🎀',
+    svgPath: (
+      <g>
+        <ellipse cx="38" cy="28" rx="10" ry="7" fill="#f9a8d4" />
+        <ellipse cx="62" cy="28" rx="10" ry="7" fill="#f9a8d4" />
+        <circle cx="50" cy="28" r="5" fill="#ec4899" />
+        <ellipse cx="38" cy="28" rx="10" ry="7" fill="none" stroke="#ec4899" strokeWidth="1.2" />
+        <ellipse cx="62" cy="28" rx="10" ry="7" fill="none" stroke="#ec4899" strokeWidth="1.2" />
+      </g>
+    ),
+  },
+];
 
 // ─── Energy configuration ───────────────────────────────────────────────────────
 
@@ -212,6 +290,7 @@ export default function Mascot({
   userName = '',
   size = 96,
   suppressBubble = false,
+  hat,
 }: MascotProps) {
   const bodyControls   = useAnimationControls(); // bounce physics
   const wrapperControls = useAnimationControls(); // energy zoom
@@ -460,6 +539,9 @@ export default function Mascot({
                     <ellipse cx="75" cy="56" rx="7" ry="4.5" fill="rgba(255,150,150,0.35)" />
                   </>
                 )}
+
+                {/* Hat layer */}
+                {hat && MASCOT_HATS.find(h => h.id === hat)?.svgPath}
               </svg>
             </motion.div>
           </div>

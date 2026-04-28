@@ -38,6 +38,9 @@ import { useDragScroll } from '@/hooks/useDragScroll';
 import MascotTutorial from './MascotTutorial';
 import { TUTORIALS } from '@/lib/tutorials';
 import { useTutorial, clearTutorialsSeen } from '@/hooks/useTutorial';
+import DemPlusHabitInput from './DemPlusHabitInput';
+import PantryTab from './PantryTab';
+import WardrobeSelector from './WardrobeSelector';
 
 // ─── Mascot message pools ────────────────────────────────────────────────────────
 
@@ -130,7 +133,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const [plan,            setPlan]           = useState<ThreeDayPlan | null>(null);
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const { triggerCelebration, celebrationProps, celebrationKey, dismissCelebration } = useCelebration();
-  const [activeBottomTab, setActiveBottomTab] = useState<'plan' | 'account' | 'progress' | 'settings'>('plan');
+  const [activeBottomTab, setActiveBottomTab] = useState<'plan' | 'account' | 'progress' | 'settings' | 'pantry'>('plan');
   const [activePillar,    setActivePillar]    = useState<'diet' | 'exercise' | 'mentality'>('diet');
   const [showEnergyModal, setShowEnergyModal] = useState(false);
   const [energySetMessage, setEnergySetMessage] = useState('');
@@ -544,6 +547,31 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     setShowDevPanel(false);
   };
 
+  // ── Pantry tab ────────────────────────────────────────────────────────────
+
+  if (activeBottomTab === 'pantry') {
+    return (
+      <EnergyBackground energy={currentDay.energyLevel}>
+        <div className="min-h-screen overflow-y-auto">
+          <PantryTab
+            energy={currentDay.energyLevel}
+            accentColor={theme.accent}
+            accentDark={theme.accentDark}
+            accentLight={theme.accentLight}
+            accentText={theme.accentText}
+          />
+          <FloatingMascot
+            energy={currentDay.energyLevel}
+            userName={userName}
+            firstVisitMessage="Add what you have, and I'll cook something up!"
+          />
+          <BottomNav activeTab={activeBottomTab} onTabChange={setActiveBottomTab} accentColor={theme.accent} />
+          <DevPanel show={showDevPanel} onToggle={() => setShowDevPanel(v => !v)} onAction={handleDevAction} devUnlocked={devUnlocked} />
+        </div>
+      </EnergyBackground>
+    );
+  }
+
   // ── Account tab ──────────────────────────────────────────────────────────
 
   if (activeBottomTab === 'account') {
@@ -611,10 +639,32 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   // ── Settings tab ─────────────────────────────────────────────────────────
 
   if (activeBottomTab === 'settings') {
+    const habitValue = loadAppState().user?.demPlusHabit ?? '';
     return (
       <EnergyBackground energy={currentDay.energyLevel}>
         <div className="min-h-screen pb-24 p-4">
           <div className="pt-8 space-y-4">
+
+            {/* Dem+ Habit */}
+            <Card>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-base font-black text-gray-900">Dem+</span>
+                <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ background: theme.accentLight, color: theme.accentText }}>Habit</span>
+              </div>
+              <p className="text-xs text-gray-400 mb-3">One habit. Every day. That&apos;s all it takes.</p>
+              <DemPlusHabitInput
+                initialValue={habitValue}
+                accentColor={theme.accent}
+                accentDark={theme.accentDark}
+                onSave={(habit) => {
+                  const state = loadAppState();
+                  if (!state.user) return;
+                  const updated = { ...state.user, demPlusHabit: habit };
+                  saveUserProfile(updated);
+                  syncUserProfile(updated);
+                }}
+              />
+            </Card>
 
             {/* Account settings — name/password change (coming soon) */}
             <Card>
@@ -651,6 +701,27 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                   </div>
                 </div>
               </div>
+            </Card>
+
+            {/* Mascot Wardrobe */}
+            <Card>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-base font-black text-gray-900">Wardrobe</span>
+                <span className="text-xs text-gray-400">Dress up your Mascot</span>
+              </div>
+              <WardrobeSelector
+                currentHat={loadAppState().user?.mascotItems?.[0] ?? ''}
+                accentColor={theme.accent}
+                accentLight={theme.accentLight}
+                accentText={theme.accentText}
+                onSelect={(hatId) => {
+                  const state = loadAppState();
+                  if (!state.user) return;
+                  const updated = { ...state.user, mascotItems: hatId ? [hatId] : [] };
+                  saveUserProfile(updated);
+                  syncUserProfile(updated);
+                }}
+              />
             </Card>
 
             {/* Danger zone */}
@@ -890,6 +961,17 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
               <MascotTutorial key="tut-progress" slides={TUTORIALS.progress} onDismiss={progressTutorial.dismiss} />
             )}
           </AnimatePresence>
+
+          {/* Accountabuddies */}
+          <AccountabuddiesCard
+            habit={loadAppState().user?.demPlusHabit ?? ''}
+            name={userName}
+            accentColor={theme.accent}
+            accentDark={theme.accentDark}
+            accentLight={theme.accentLight}
+            accentText={theme.accentText}
+          />
+
           <DevPanel show={showDevPanel} onToggle={() => setShowDevPanel(v => !v)} onAction={handleDevAction} devUnlocked={devUnlocked} />
         </div>
       </EnergyBackground>
@@ -1125,6 +1207,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
             streak={streak}
             pillar={activePillar}
             size={96}
+            hat={loadAppState().user?.mascotItems?.[0]}
           />
         </motion.div>
 
@@ -1180,6 +1263,23 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
         </AnimatePresence>
       </div>
 
+      {/* Dem+ Habit reminder */}
+      {(() => {
+        const habit = loadAppState().user?.demPlusHabit;
+        return habit ? (
+          <div className="mx-4 mb-3">
+            <div className="rounded-2xl px-4 py-3 flex items-center gap-3"
+              style={{ background: theme.accentLight }}>
+              <span className="text-lg">🎯</span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: theme.accentText }}>Today&apos;s Habit</p>
+                <p className="text-sm font-bold text-gray-700 truncate">{habit}</p>
+              </div>
+            </div>
+          </div>
+        ) : null;
+      })()}
+
       <BottomNav activeTab={activeBottomTab} onTabChange={setActiveBottomTab} accentColor={theme.accent} />
 
       {/* Celebration overlay */}
@@ -1228,6 +1328,61 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       </AnimatePresence>
 
     </EnergyBackground>
+  );
+}
+
+// ─── Accountabuddies card ────────────────────────────────────────────────────────
+
+function AccountabuddiesCard({
+  habit, name, accentColor, accentDark, accentLight, accentText,
+}: {
+  habit: string; name: string;
+  accentColor: string; accentDark: string; accentLight: string; accentText: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  if (!habit) {
+    return (
+      <Card>
+        <p className="font-black text-gray-900 text-sm mb-1">🤝 Accountabuddies</p>
+        <p className="text-xs text-gray-400 leading-relaxed">
+          Set a habit in Settings to get a shareable buddy link. Keep each other on track!
+        </p>
+      </Card>
+    );
+  }
+
+  const link = typeof window !== 'undefined'
+    ? `${window.location.origin}/buddy?habit=${encodeURIComponent(habit)}&name=${encodeURIComponent(name || 'A friend')}`
+    : '';
+
+  const copy = () => {
+    navigator.clipboard.writeText(link).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <Card>
+      <p className="font-black text-gray-900 text-sm mb-1">🤝 Accountabuddies</p>
+      <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+        Share this link with someone to build <span className="font-bold">&ldquo;{habit}&rdquo;</span> together.
+      </p>
+      <div className="flex gap-2">
+        <div className="flex-1 rounded-xl px-3 py-2 bg-gray-50 border border-gray-200 text-xs text-gray-400 font-mono truncate">
+          {link}
+        </div>
+        <motion.button
+          onClick={copy}
+          className="px-3 py-2 rounded-xl text-xs font-black text-white flex-shrink-0"
+          style={{ background: copied ? '#16a34a' : accentColor, boxShadow: `0 3px 0 0 ${accentDark}` }}
+          whileTap={{ scale: 0.92, y: 1, boxShadow: 'none' }}
+        >
+          {copied ? '✓ Copied' : 'Copy'}
+        </motion.button>
+      </div>
+    </Card>
   );
 }
 
