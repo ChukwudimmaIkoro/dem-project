@@ -2,8 +2,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'Press Kit — Dem',
-  description: 'Press resources for Dem, the energy-adaptive health companion app.',
+  title: 'Dem Press Kit',
+  description: 'Press resources for Dem, the app that adapts.',
 };
 
 export default function PressPage() {
@@ -37,13 +37,13 @@ export default function PressPage() {
         <section className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
           <h2 className="text-lg font-black text-gray-900">About Dem</h2>
           <p className="text-gray-600 text-sm leading-relaxed font-bold">
-            Dem is an energy-adaptive health companion that builds daily Diet, Exercise, and Mentality plans around how you actually feel — not a fixed routine.
+            Dem is an energy-adaptive health companion that builds daily Diet, Exercise, and Mentality plans around how you ACTUALLY feel, rather than just a fixed routine. It’s designed to meet you where you are each day, making healthy habits more sustainable and less intimidating, whether you’re having a great day or a really tough one.
           </p>
           <p className="text-gray-500 text-sm leading-relaxed">
-            Every morning, you set your energy level: low, medium, or high. Dem reshapes your entire day around that — simpler meals when you're drained, more involved workouts when you're fired up. Three AI coaches handle meal recipes, exercise form, and mental health check-ins. The goal is a health habit that survives real life, not an idealized version of it.
+            Every morning, you set your energy level: low, medium, or high. Dem reshapes your entire day around that, giving you simpler meals when you're drained, and more involved workouts when you're fired up. The AI-assisted mascot (also named Dem!) handles meal recipes, exercise form, and mental health check-ins. The goal is to develop a health habit that actually sticks.
           </p>
           <p className="text-gray-500 text-sm leading-relaxed">
-            Dem tracks streaks across multi-day plans (3, 5, 7, 14, or 30 days) and adapts the streak goal as you grow. It works fully without an account — no friction to start — and syncs to the cloud when you sign up.
+            Dem tracks streaks across multi-day plans (3, 5, 7, 14, or 30 days) and adapts the streak goal as you grow. After making an account, you can check in anytime, anywhere.
           </p>
         </section>
 
@@ -53,9 +53,9 @@ export default function PressPage() {
           <div className="grid grid-cols-2 gap-4 text-sm">
             {[
               { label: 'Category', value: 'Health & Fitness' },
-              { label: 'Platform', value: 'Web (iOS & Android coming)' },
-              { label: 'Status', value: 'Alpha — live at trydem.app' },
-              { label: 'Launch', value: 'April 2026' },
+              { label: 'Platform', value: 'Web (iOS & Android coming soon!)' },
+              { label: 'Status', value: 'Alpha: live at trydem.app' },
+              { label: 'Launch', value: 'May 2026' },
               { label: 'Founder', value: 'Chuchu Ikoro' },
               { label: 'Built with', value: 'Next.js, Supabase, Claude AI' },
             ].map(({ label, value }) => (
@@ -75,17 +75,17 @@ export default function PressPage() {
               {
                 emoji: '🥗',
                 name: 'Diet',
-                desc: 'Daily meal plans built from your preferred foods. AI generates a full recipe — ingredients, steps, macros — matched to your energy level. Low energy days get 10-minute no-cook meals. High energy days get properly nutritious builds.',
+                desc: 'Daily meal plans built from your preferred foods. Users can optionally use AI to generate a full recipe, with ingredients, steps, and macros, all matched to your energy level. Lower energy days get short no-cook meals, While high energy days get full on multi-step recipes!',
               },
               {
                 emoji: '🏋️',
                 name: 'Exercise',
-                desc: 'Workouts chosen from exercises you selected during onboarding, scaled to your energy. An AI coach provides form cues, step-by-step instructions, and a modification for any difficulty level.',
+                desc: 'Workouts chosen from your preferred exercises, scaled to your energy. Users can optionally use AI to get form cues, step-by-step instructions, and modifications for any difficulty level.',
               },
               {
                 emoji: '🧠',
                 name: 'Mentality',
-                desc: 'Daily mental health check-ins: breathing exercises, affirmations, grounding techniques, journaling prompts. Chosen from categories you set — mindfulness, physical, emotional, or sensory.',
+                desc: 'Daily mental health check-ins: breathing exercises, affirmations, grounding techniques, and journaling prompts, chosen from categories you set. After all, without the right mentaility, everything falls apart.',
               },
             ].map(({ emoji, name, desc }) => (
               <div key={name} className="flex gap-3">
@@ -104,12 +104,11 @@ export default function PressPage() {
           <h2 className="text-lg font-black text-gray-900">What Makes It Different</h2>
           <ul className="space-y-2 text-sm text-gray-500">
             {[
-              'Energy-adaptive: the same app behaves differently on your best and worst days',
-              'No rigid routine — streaks reward showing up, not perfection',
-              'AI that is transparent: you see exactly what it generated and why',
-              'Works fully offline / without an account — no paywall to start',
+              'Energy-adaptive: the app behaves differently on your best and worst days',
+              'No rigid routine: the streak system reward showing up, not perfection',
+              'Transparent AI Integration: all AI features are optional and transparent, providing additional support without being intrusive.',
               'Clinical framing: health summaries formatted for care providers',
-              'Mascot-driven UX that feels alive, not sterile',
+              'Dem, the Mascot!: A lively creature that lives in the UI and helps you understand plans, gives you tips, and provides encouragement. It’s like having a health buddy who’s always there to support you!',
             ].map(item => (
               <li key={item} className="flex gap-2">
                 <span className="text-green-500 font-black flex-shrink-0">→</span>
@@ -158,25 +157,38 @@ export default function PressPage() {
           <div className="flex flex-wrap gap-4 items-center">
             <div className="flex flex-col items-center gap-2">
               <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-black"
+                className="w-16 h-16 rounded-2xl flex items-center justify-center"
                 style={{ background: '#22c55e' }}
               >
-                D
+                <svg width="48" height="48" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="44" fill="#22c55e" />
+                  <ellipse cx="35" cy="28" rx="13" ry="9" fill="rgba(255,255,255,0.28)" />
+                  <ellipse cx="32" cy="26" rx="5" ry="3" fill="rgba(255,255,255,0.18)" />
+                  <ellipse cx="34" cy="44" rx="5.5" ry="6.5" fill="white" />
+                  <ellipse cx="66" cy="44" rx="5.5" ry="6.5" fill="white" />
+                  <circle cx="35.5" cy="45.5" r="3.8" fill="#1a1a2e" />
+                  <circle cx="67.5" cy="45.5" r="3.8" fill="#1a1a2e" />
+                  <circle cx="37.5" cy="43.5" r="1.4" fill="white" opacity="0.9" />
+                  <circle cx="69.5" cy="43.5" r="1.4" fill="white" opacity="0.9" />
+                  <path d="M 37 57 Q 50 70 63 57" stroke="#1a1a2e" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+                  <ellipse cx="25" cy="56" rx="7" ry="4.5" fill="rgba(255,150,150,0.35)" />
+                  <ellipse cx="75" cy="56" rx="7" ry="4.5" fill="rgba(255,150,150,0.35)" />
+                </svg>
               </div>
               <span className="text-xs text-gray-400">App icon</span>
             </div>
             <div className="flex flex-col gap-2 text-sm">
               <div className="flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full inline-block flex-shrink-0" style={{ background: '#22c55e' }} />
-                <span className="text-gray-600">Brand green — <code className="text-xs bg-gray-100 px-1 rounded">#22c55e</code></span>
+                <span className="text-gray-600">Brand green: <code className="text-xs bg-gray-100 px-1 rounded">#22c55e</code></span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full inline-block flex-shrink-0" style={{ background: '#16a34a' }} />
-                <span className="text-gray-600">Dark green — <code className="text-xs bg-gray-100 px-1 rounded">#16a34a</code></span>
+                <span className="text-gray-600">Dark green: <code className="text-xs bg-gray-100 px-1 rounded">#16a34a</code></span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full inline-block flex-shrink-0 border border-gray-200" style={{ background: '#f0fdf4' }} />
-                <span className="text-gray-600">Background — <code className="text-xs bg-gray-100 px-1 rounded">#f0fdf4</code></span>
+                <span className="text-gray-600">Background: <code className="text-xs bg-gray-100 px-1 rounded">#f0fdf4</code></span>
               </div>
             </div>
           </div>
@@ -190,7 +202,7 @@ export default function PressPage() {
           <h2 className="text-lg font-black text-gray-900">Founder</h2>
           <div className="text-sm text-gray-500 leading-relaxed space-y-2">
             <p>
-              <span className="font-bold text-gray-800">Chuchu Ikoro</span> — Solo founder and developer of Dem. Built the initial version during a hackathon and has been developing it into a full consumer health product since. Background in software engineering, focused on health-tech and mobile-first products.
+              <span className="font-bold text-gray-800">Chuchu Ikoro</span>: Solo founder and developer of Dem. Built the initial version during a hackathon in February 2026 and has been developing it into a full consumer health product since. Background in software engineering, focused on health-tech and mobile-first products.
             </p>
             <p>
               Available for interviews, demos, and press inquiries at{' '}
