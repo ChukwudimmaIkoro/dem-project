@@ -41,6 +41,7 @@ import { useTutorial, clearTutorialsSeen } from '@/hooks/useTutorial';
 import DemPlusHabitInput from './DemPlusHabitInput';
 import PantryTab from './PantryTab';
 import WardrobeSelector from './WardrobeSelector';
+import { getPantryForMeal } from '@/lib/pantry';
 
 // ─── Mascot message pools ────────────────────────────────────────────────────────
 
@@ -554,7 +555,6 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       <EnergyBackground energy={currentDay.energyLevel}>
         <div className="min-h-screen overflow-y-auto">
           <PantryTab
-            energy={currentDay.energyLevel}
             accentColor={theme.accent}
             accentDark={theme.accentDark}
             accentLight={theme.accentLight}
@@ -1211,6 +1211,20 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
           />
         </motion.div>
 
+        {/* Dem+ habit bubble */}
+        {(() => {
+          const habit = loadAppState().user?.demPlusHabit;
+          return habit ? (
+            <div className="flex justify-center mb-3">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold shadow-sm"
+                style={{ background: 'white', border: `1.5px solid ${theme.accent}33`, color: theme.accentText }}>
+                <span>🎯</span>
+                <span className="max-w-[220px] truncate">{habit}</span>
+              </div>
+            </div>
+          ) : null;
+        })()}
+
         {/* Pillar tabs */}
         <PillarTabs
           activePillar={activePillar}
@@ -1239,6 +1253,10 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 isPastDay={isPastDay}
                 onEditPrefs={() => setEditingPrefs('diet')}
                 onAILoaded={handleDietAILoaded}
+                pantryBreakfast={getPantryForMeal('breakfast')}
+                pantryLunch={getPantryForMeal('lunch')}
+                pantryDinner={getPantryForMeal('dinner')}
+                pantrySnack={getPantryForMeal('snack')}
               />
             )}
             {activePillar === 'exercise' && (
@@ -1262,23 +1280,6 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
           </motion.div>
         </AnimatePresence>
       </div>
-
-      {/* Dem+ Habit reminder */}
-      {(() => {
-        const habit = loadAppState().user?.demPlusHabit;
-        return habit ? (
-          <div className="mx-4 mb-3">
-            <div className="rounded-2xl px-4 py-3 flex items-center gap-3"
-              style={{ background: theme.accentLight }}>
-              <span className="text-lg">🎯</span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: theme.accentText }}>Today&apos;s Habit</p>
-                <p className="text-sm font-bold text-gray-700 truncate">{habit}</p>
-              </div>
-            </div>
-          </div>
-        ) : null;
-      })()}
 
       <BottomNav activeTab={activeBottomTab} onTabChange={setActiveBottomTab} accentColor={theme.accent} />
 
@@ -1460,10 +1461,13 @@ function DevPanel({
 
 // ─── Diet view ───────────────────────────────────────────────────────────────────
 
-function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor, onEditPrefs, isPastDay, onAILoaded }: {
+function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor, onEditPrefs, isPastDay, onAILoaded,
+  pantryBreakfast = [], pantryLunch = [], pantryDinner = [], pantrySnack = [],
+}: {
   day: DayPlan; isCompleted: boolean; onToggle: () => void;
   userName?: string; userFoods: string[]; accentColor: string; onEditPrefs: () => void;
   isPastDay?: boolean; onAILoaded?: () => void;
+  pantryBreakfast?: string[]; pantryLunch?: string[]; pantryDinner?: string[]; pantrySnack?: string[];
 }) {
   const [meals,   setMeals]   = useState(day.diet.meals);
   const [spinning, setSpinning] = useState<string | null>(null);
@@ -1518,34 +1522,35 @@ function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor
         </motion.button>
       </div>
 
-      <MealSectionShuffleable title="Breakfast" items={meals.breakfast} Icon={Sunrise}
+      <MealSectionShuffleable title="Breakfast" items={meals.breakfast} pantryItems={pantryBreakfast} Icon={Sunrise}
         mealKey="breakfast" spinning={spinning === 'breakfast'} onShuffle={() => shuffleMeal('breakfast')}
-        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} onAILoaded={onAILoaded} />
-      <MealSectionShuffleable title="Lunch" items={meals.lunch} Icon={Sun}
+        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} onAILoaded={onAILoaded} accentColor={accentColor} />
+      <MealSectionShuffleable title="Lunch" items={meals.lunch} pantryItems={pantryLunch} Icon={Sun}
         mealKey="lunch" spinning={spinning === 'lunch'} onShuffle={() => shuffleMeal('lunch')}
-        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} onAILoaded={onAILoaded} />
-      <MealSectionShuffleable title="Dinner" items={meals.dinner} Icon={Moon}
+        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} onAILoaded={onAILoaded} accentColor={accentColor} />
+      <MealSectionShuffleable title="Dinner" items={meals.dinner} pantryItems={pantryDinner} Icon={Moon}
         mealKey="dinner" spinning={spinning === 'dinner'} onShuffle={() => shuffleMeal('dinner')}
-        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} onAILoaded={onAILoaded} />
-      {meals.snack && meals.snack.length > 0 && (
-        <MealSectionShuffleable title="Snack" items={meals.snack} Icon={Coffee}
+        dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} onAILoaded={onAILoaded} accentColor={accentColor} />
+      {(meals.snack && meals.snack.length > 0 || pantrySnack.length > 0) && (
+        <MealSectionShuffleable title="Snack" items={meals.snack ?? []} pantryItems={pantrySnack} Icon={Coffee}
           mealKey="snack" spinning={spinning === 'snack'} onShuffle={() => shuffleMeal('snack')}
-          dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} onAILoaded={onAILoaded} />
+          dayNumber={day.dayNumber} energyLevel={day.energyLevel} userName={userName} isPastDay={isPastDay} onAILoaded={onAILoaded} accentColor={accentColor} />
       )}
     </Card>
   );
 }
 
-function MealSectionShuffleable({ title, items, Icon, mealKey, spinning, onShuffle, dayNumber, energyLevel, userName, isPastDay, onAILoaded }: {
-  title: string; items: string[]; Icon: LucideIcon;
+function MealSectionShuffleable({ title, items, pantryItems = [], Icon, mealKey, spinning, onShuffle, dayNumber, energyLevel, userName, isPastDay, onAILoaded, accentColor }: {
+  title: string; items: string[]; pantryItems?: string[]; Icon: LucideIcon;
   mealKey: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   spinning: boolean; onShuffle: () => void;
   isPastDay?: boolean; onAILoaded?: () => void;
-  dayNumber: number; energyLevel: EnergyLevel; userName?: string;
+  dayNumber: number; energyLevel: EnergyLevel; userName?: string; accentColor?: string;
 }) {
+  const allFoods = [...(items ?? []), ...pantryItems];
   return (
     <div className="mb-3">
-      <AIRecipeCard foods={items ?? []} mealType={mealKey}
+      <AIRecipeCard foods={allFoods} mealType={mealKey}
         energyLevel={energyLevel} dayNumber={dayNumber} userName={userName} locked={isPastDay} onLoaded={onAILoaded} />
       <div className="bg-gray-50 p-3 rounded-2xl">
         <div className="flex items-center justify-between mb-2">
@@ -1572,6 +1577,13 @@ function MealSectionShuffleable({ title, items, Icon, mealKey, spinning, onShuff
             <span key={idx}
               className="text-sm px-3 py-1 rounded-full font-semibold bg-dem-green-100 text-dem-green-700">
               {item}
+            </span>
+          ))}
+          {pantryItems.map((item, idx) => (
+            <span key={`pantry-${idx}`}
+              className="text-sm px-3 py-1 rounded-full font-semibold flex items-center gap-1"
+              style={{ background: '#fef9c3', color: '#854d0e' }}>
+              🧺 {item}
             </span>
           ))}
         </motion.div>
