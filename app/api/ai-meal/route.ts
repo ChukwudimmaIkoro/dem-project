@@ -11,18 +11,18 @@ export async function POST(req: NextRequest) {
       ? 'Moderate prep, 15-20 minutes. Simple cooking allowed.'
       : 'Can be more involved, 20-30 minutes. Optimize for nutrition and macros.';
 
-    const prompt = `You are a culinary expert and nutritionist. Your task is to create a high-quality ${mealType} recipe.
+    const prompt = `Create a realistic home-cooked ${mealType} recipe. Think: something a regular person would actually make and enjoy on a weeknight, not a restaurant dish.
 
-Before generating, think about what a well-tested, professional cookbook-quality recipe using these ingredients looks like — authentic techniques, realistic quantities, and clear actionable steps — then produce a recipe of equivalent quality and reliability.
-
-Available ingredients (use as many as fit naturally): ${foods.join(', ')}
+Available ingredients (use what fits): ${foods.join(', ')}
 
 Energy level: ${energyLevel} — ${complexityGuide}
 
+Skew toward common, recognizable meals. A chicken and rice bowl, a simple pasta, scrambled eggs with toast, a basic salad — these are good. Obscure fusion dishes or elaborate techniques are not.
+
 Produce ONLY this JSON, no other text:
 {
-  "name": "Recipe name (creative, appetizing — like a real cookbook title)",
-  "tagline": "One evocative sentence describing the dish",
+  "name": "Recipe name (simple and descriptive)",
+  "tagline": "One plain sentence describing the dish",
   "prepTime": "X minutes",
   "ingredients": [
     {"item": "ingredient name", "amount": "realistic quantity with units"},
@@ -39,10 +39,10 @@ Produce ONLY this JSON, no other text:
     "fats": "Xg",
     "calories": "~XXX"
   },
-  "tip": "A pro technique tip from a professional kitchen"
+  "tip": "One short practical tip"
 }
 
-Use 4-7 ingredients. Quantities must be realistic (e.g. '2 cups', '1 tbsp', '3 oz'). Steps must be actionable and specific. Make it genuinely delicious and practical to cook at home.`;
+Use 4-7 ingredients. Quantities must be realistic (e.g. '2 cups', '1 tbsp', '3 oz'). Steps must be actionable and specific.`;
 
     const message = await callClaude({
       max_tokens: 900,

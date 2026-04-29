@@ -3,7 +3,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
-import { loadPantry, addPantryItem, removePantryItem, classifyMealTypes, PantryItem, MealType } from '@/lib/pantry';
+import {
+  loadPantry, addPantryItem, removePantryItem, classifyMealTypes,
+  getPantryHighlight, setPantryHighlight, PantryItem, MealType,
+} from '@/lib/pantry';
 import { Card } from './Card';
 
 const MEAL_LABELS: { id: MealType; label: string; emoji: string }[] = [
@@ -22,12 +25,16 @@ interface PantryTabProps {
 }
 
 export default function PantryTab({ accentColor, accentDark, accentLight, accentText, inSheet }: PantryTabProps) {
-  const [items,      setItems]      = useState<PantryItem[]>([]);
-  const [draft,      setDraft]      = useState('');
-  const [mealTypes,  setMealTypes]  = useState<MealType[]>([]);
-  const [showChips,  setShowChips]  = useState(false);
+  const [items,     setItems]     = useState<PantryItem[]>([]);
+  const [draft,     setDraft]     = useState('');
+  const [mealTypes, setMealTypes] = useState<MealType[]>([]);
+  const [showChips, setShowChips] = useState(false);
+  const [highlight, setHighlight] = useState(false);
 
-  useEffect(() => { setItems(loadPantry()); }, []);
+  useEffect(() => {
+    setItems(loadPantry());
+    setHighlight(getPantryHighlight());
+  }, []);
 
   const handleDraftChange = (val: string) => {
     setDraft(val);
@@ -56,6 +63,12 @@ export default function PantryTab({ accentColor, accentDark, accentLight, accent
 
   const handleRemove = (id: string) => setItems(removePantryItem(id));
 
+  const handleHighlightToggle = () => {
+    const next = !highlight;
+    setHighlight(next);
+    setPantryHighlight(next);
+  };
+
   // Group items by meal type for display
   const grouped = MEAL_LABELS.map(m => ({
     ...m,
@@ -65,11 +78,13 @@ export default function PantryTab({ accentColor, accentDark, accentLight, accent
   return (
     <div className={`px-4 space-y-4 ${inSheet ? 'pt-4 pb-8' : 'pt-8 pb-28'}`}>
 
-      {/* Header */}
-      <div>
-        <h2 className="text-2xl font-black text-gray-900">Pantry</h2>
-        <p className="text-sm text-gray-400 mt-0.5">Ingredients here flow into your Diet tab meals.</p>
-      </div>
+      {/* Header — only show when not in sheet (sheet has its own header) */}
+      {!inSheet && (
+        <div>
+          <h2 className="text-2xl font-black text-gray-900">Pantry</h2>
+          <p className="text-sm text-gray-400 mt-0.5">Ingredients here flow into your Diet tab meals.</p>
+        </div>
+      )}
 
       {/* Add item */}
       <Card>
@@ -134,6 +149,28 @@ export default function PantryTab({ accentColor, accentDark, accentLight, accent
             </motion.div>
           )}
         </AnimatePresence>
+      </Card>
+
+      {/* Highlight setting */}
+      <Card>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-black text-gray-800">Always include in daily meal prep</p>
+            <p className="text-xs text-gray-400 mt-0.5">Pin pantry items as 🧺 badges in the Diet tab each day</p>
+          </div>
+          <motion.button
+            onClick={handleHighlightToggle}
+            className="w-12 h-7 rounded-full flex-shrink-0 relative"
+            style={{ background: highlight ? accentColor : '#d1d5db' }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <motion.div
+              className="absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-sm"
+              animate={{ left: highlight ? '50%' : '2px' }}
+              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            />
+          </motion.button>
+        </div>
       </Card>
 
       {/* Items grouped by meal */}

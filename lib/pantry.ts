@@ -1,4 +1,15 @@
-const PANTRY_KEY = 'dem-pantry';
+const PANTRY_KEY           = 'dem-pantry';
+const PANTRY_HIGHLIGHT_KEY = 'dem-pantry-highlight';
+
+export function getPantryHighlight(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(PANTRY_HIGHLIGHT_KEY) === 'true';
+}
+
+export function setPantryHighlight(v: boolean): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(PANTRY_HIGHLIGHT_KEY, v ? 'true' : 'false');
+}
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 

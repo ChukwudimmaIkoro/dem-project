@@ -15,7 +15,7 @@ interface MascotProps {
   dayNumber?: number;
   completedTasks?: string[];
   streak?: number;
-  pillar?: 'diet' | 'exercise' | 'mentality';
+  pillar?: 'diet' | 'exercise' | 'mentality' | 'habit';
   size?: number; // SVG rendered size in px (default 96)
   suppressBubble?: boolean; // hide speech bubble entirely (used in tutorial overlay)
   hat?: string; // hat item ID from MASCOT_HATS

@@ -16,8 +16,14 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   dummy_currency          INTEGER DEFAULT 0,
   longest_streak          INTEGER DEFAULT 0,
   tutorials_seen          TEXT[] DEFAULT '{}',
+  dem_plus_habit          TEXT,
+  mascot_items            TEXT[] DEFAULT '{}',
   created_at              TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Run these on existing databases that predate the above columns:
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS dem_plus_habit TEXT;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS mascot_items TEXT[] DEFAULT '{}';
 
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 

@@ -97,6 +97,7 @@ export interface DayPlan {
     diet: boolean;
     exercise: boolean;
     mentality: boolean;
+    habit?: boolean;
   };
 }
 

@@ -21,7 +21,7 @@ import { Card } from './Card';
 import {
   Check, Flame, RotateCcw, Utensils, Dumbbell, Brain,
   Sunrise, Sun, Moon, Coffee, Sparkles, Wrench, Settings2,
-  Lock, CheckCircle2, Eye, Circle, Clock, Lightbulb, CalendarDays, Trophy, ShoppingBasket, X as XIcon, type LucideIcon,
+  Lock, CheckCircle2, Eye, Circle, Clock, Lightbulb, CalendarDays, Trophy, ShoppingBasket, X as XIcon, Target, Pencil, type LucideIcon,
 } from 'lucide-react';
 import { CelebrationOverlay } from './CelebrationOverlay';
 import { useCelebration } from '@/hooks/useCelebration';
@@ -41,7 +41,8 @@ import { useTutorial, clearTutorialsSeen } from '@/hooks/useTutorial';
 import DemPlusHabitInput from './DemPlusHabitInput';
 import PantryTab from './PantryTab';
 import WardrobeSelector from './WardrobeSelector';
-import { getPantryForMeal } from '@/lib/pantry';
+import { getPantryForMeal, getPantryHighlight } from '@/lib/pantry';
+import { getTreatsRemainingToday, FREE_DAILY_LIMIT } from '@/lib/thinkyTreats';
 
 // ─── Mascot message pools ────────────────────────────────────────────────────────
 
@@ -136,12 +137,12 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const { triggerCelebration, celebrationProps, celebrationKey, dismissCelebration } = useCelebration();
   const [activeBottomTab, setActiveBottomTab] = useState<'plan' | 'account' | 'progress' | 'settings'>('plan');
   const [showPantrySheet, setShowPantrySheet] = useState(false);
-  const [activePillar,    setActivePillar]    = useState<'diet' | 'exercise' | 'mentality'>('diet');
+  const [activePillar,    setActivePillar]    = useState<'diet' | 'exercise' | 'mentality' | 'habit'>('diet');
   const [showEnergyModal, setShowEnergyModal] = useState(false);
   const [energySetMessage, setEnergySetMessage] = useState('');
   const [tickleMessage,   setTickleMessage]   = useState('');
   const [tabMessage,      setTabMessage]      = useState('');
-  const [lastPillar,      setLastPillar]      = useState<'diet' | 'exercise' | 'mentality'>('diet');
+  const [lastPillar,      setLastPillar]      = useState<'diet' | 'exercise' | 'mentality' | 'habit'>('diet');
   const [userName,        setUserName]        = useState('');
   const [userFoods,       setUserFoods]       = useState<string[]>([]);
   // Energy transition overlay
@@ -156,11 +157,9 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   // Preferences editing
   const [editingPrefs, setEditingPrefs] = useState<'diet' | 'exercise' | 'mentality' | null>(null);
 
-  // Dev panel — visible by default in DEV_MODE, hidden in prod; Konami toggles it
   const [devUnlocked,  setDevUnlocked]  = useState(DEV_MODE);
   const konamiProgress = useRef(0);
 
-  // Tutorials — one per context
   const homeTutorial           = useTutorial('home');
   const streakCompleteTutorial = useTutorial('streakComplete');
   const planExpiredTutorial    = useTutorial('planExpired');
@@ -286,9 +285,10 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   }, [plan]);
 
   // Mascot message on pillar tab change
-  const getMascotTabMessage = (pillar: 'diet' | 'exercise' | 'mentality') => {
+  const getMascotTabMessage = (pillar: 'diet' | 'exercise' | 'mentality' | 'habit') => {
     if (pillar === 'diet')      return 'Fuel your body with foods you love!';
     if (pillar === 'exercise')  return 'Move your body, feel the energy!';
+    if (pillar === 'habit')     return 'One habit a day keeps the doctor away!';
     return 'Your mind is the foundation. This matters most.';
   };
 
@@ -317,9 +317,6 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
 
   const currentDay   = plan.days[currentDayIndex];
   const activeDayIdx = getActiveDayIndex(plan);
-  // If any past day is gray (missed), the carry-over from previous plans is forfeit.
-  // Compute this inline during render — never rely on an effect to update it first,
-  // which avoids any timing window where the displayed streak shows a stale value.
   const hasGrayDay      = plan.days.slice(0, activeDayIdx).some(d => !isDayComplete(d));
   const effectiveCarryOver = hasGrayDay ? 0 : (plan.carryOverStreak ?? 0);
   const streak          = effectiveCarryOver + calculateStreak(plan, activeDayIdx);
@@ -360,7 +357,6 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     if (currentDay.completed[pillar]) return;
     const wasComplete = isComplete;
 
-    // Build updated plan directly — don't re-read from localStorage to avoid race conditions
     const updatedDays = [...plan.days];
     updatedDays[currentDayIndex] = {
       ...updatedDays[currentDayIndex],
@@ -371,7 +367,6 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     }
     const updatedPlan = { ...plan, days: updatedDays };
 
-    // Persist then set React state from the same object — no localStorage round-trip
     saveCurrentPlan(updatedPlan);
     setPlan(updatedPlan);
 
@@ -391,6 +386,20 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
         }
       }
     }
+  };
+
+  // Habit toggle — two-way (can uncheck), doesn't affect streak or day completion
+  const toggleHabit = () => {
+    if (isPastDay) return;
+    const updatedDays = [...plan.days];
+    const current = updatedDays[currentDayIndex].completed.habit ?? false;
+    updatedDays[currentDayIndex] = {
+      ...updatedDays[currentDayIndex],
+      completed: { ...updatedDays[currentDayIndex].completed, habit: !current },
+    };
+    const updatedPlan = { ...plan, days: updatedDays };
+    saveCurrentPlan(updatedPlan);
+    setPlan(updatedPlan);
   };
 
   const handleDayChange = (dayIdx: number) => {
@@ -625,9 +634,25 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
 
             {/* Dem+ Habit */}
             <Card>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-base font-black text-gray-900">Dem+</span>
-                <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ background: theme.accentLight, color: theme.accentText }}>Habit</span>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-black text-gray-900">Dem+</span>
+                  <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ background: theme.accentLight, color: theme.accentText }}>Habit</span>
+                </div>
+                {habitValue ? (
+                  <button
+                    onClick={() => {
+                      const state = loadAppState();
+                      if (!state.user) return;
+                      const updated = { ...state.user, demPlusHabit: '' };
+                      saveUserProfile(updated);
+                      syncUserProfile(updated).catch(() => {});
+                    }}
+                    className="text-xs font-bold text-red-400 hover:text-red-600"
+                  >
+                    Clear
+                  </button>
+                ) : null}
               </div>
               <p className="text-xs text-gray-400 mb-3">One habit. Every day. That&apos;s all it takes.</p>
               <DemPlusHabitInput
@@ -1021,16 +1046,30 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
             <p className="text-sm text-gray-500 font-semibold">Day {currentDay.dayNumber} of {plan.planLength ?? 3}</p>
           </div>
 
-          {/* Streak badge */}
-          <motion.div
-            className="flex items-center gap-1.5 px-4 py-2 rounded-2xl"
-            animate={{ background: `${theme.accent}18` }}
-            transition={{ duration: 0.6 }}
-          >
-            <Flame className="w-5 h-5" style={{ color: theme.accent }} />
-            <span className="text-2xl font-black" style={{ color: theme.accent }}>{streak}</span>
-            <span className="text-xs font-bold text-gray-500">streak</span>
-          </motion.div>
+          {/* Right side: treats + streak */}
+          <div className="flex items-center gap-2">
+            {/* Thinky Treats remaining */}
+            <motion.div
+              className="flex items-center gap-1.5 px-4 py-2 rounded-2xl"
+              animate={{ background: `${theme.accent}18` }}
+              transition={{ duration: 0.6 }}
+            >
+              <span className="text-xl leading-none">🍬</span>
+              <span className="text-2xl font-black" style={{ color: theme.accent }}>{getTreatsRemainingToday()}</span>
+              <span className="text-xs font-bold text-gray-500">/{FREE_DAILY_LIMIT}</span>
+            </motion.div>
+
+            {/* Streak badge */}
+            <motion.div
+              className="flex items-center gap-1.5 px-4 py-2 rounded-2xl"
+              animate={{ background: `${theme.accent}18` }}
+              transition={{ duration: 0.6 }}
+            >
+              <Flame className="w-5 h-5" style={{ color: theme.accent }} />
+              <span className="text-2xl font-black" style={{ color: theme.accent }}>{streak}</span>
+              <span className="text-xs font-bold text-gray-500">streak</span>
+            </motion.div>
+          </div>
         </div>
 
         {/* Day navigator — horizontal scroll for long plans */}
@@ -1189,25 +1228,12 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
           />
         </motion.div>
 
-        {/* Dem+ habit bubble */}
-        {(() => {
-          const habit = loadAppState().user?.demPlusHabit;
-          return habit ? (
-            <div className="flex justify-center mb-3">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold shadow-sm"
-                style={{ background: 'white', border: `1.5px solid ${theme.accent}33`, color: theme.accentText }}>
-                <span>🎯</span>
-                <span className="max-w-[220px] truncate">{habit}</span>
-              </div>
-            </div>
-          ) : null;
-        })()}
-
         {/* Pillar tabs */}
         <PillarTabs
           activePillar={activePillar}
           onPillarChange={setActivePillar}
           completedPillars={currentDay.completed}
+          showHabit={!!(loadAppState().user?.demPlusHabit)}
         />
 
         {/* Pillar content */}
@@ -1256,6 +1282,21 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 onEditPrefs={() => setEditingPrefs('mentality')}
               />
             )}
+            {activePillar === 'habit' && (
+              <HabitView
+                habit={loadAppState().user?.demPlusHabit ?? ''}
+                isCompleted={currentDay.completed.habit ?? false}
+                onToggle={toggleHabit}
+                onSaveHabit={(h) => {
+                  const state = loadAppState();
+                  if (!state.user) return;
+                  const updated = { ...state.user, demPlusHabit: h };
+                  saveUserProfile(updated);
+                  syncUserProfile(updated).catch(() => {});
+                }}
+                isPastDay={isPastDay}
+              />
+            )}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -1276,7 +1317,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       <AnimatePresence>
         {showPantrySheet && (
           <motion.div
-            className="fixed inset-0 z-[170] flex items-end justify-center"
+            className="fixed inset-0 z-[170] flex items-center justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.55)' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1284,12 +1325,12 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
             onClick={() => setShowPantrySheet(false)}
           >
             <motion.div
-              className="bg-white w-full max-w-md rounded-t-3xl overflow-hidden flex flex-col"
-              style={{ maxHeight: '88vh' }}
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className="bg-white w-full max-w-md rounded-3xl overflow-hidden flex flex-col shadow-2xl"
+              style={{ maxHeight: '82vh' }}
+              initial={{ scale: 0.88, y: 16, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 26 }}
               onClick={e => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
@@ -1531,7 +1572,7 @@ function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor
         <div className="flex items-center gap-2">
           <motion.button
             onClick={onOpenPantry}
-            className="w-11 h-11 rounded-xl flex items-center justify-center border-2 border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+            className="w-11 h-11 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100"
             title="Open pantry"
             whileTap={{ scale: 0.9 }}
           >
@@ -1569,6 +1610,28 @@ function DietView({ day, isCompleted, onToggle, userName, userFoods, accentColor
   );
 }
 
+function buildDisplaySet(
+  items: string[],
+  pantryItems: string[],
+  alwaysInclude: boolean,
+): { name: string; fromPantry: boolean }[] {
+  if (alwaysInclude) {
+    return [
+      ...items.map(n => ({ name: n, fromPantry: false })),
+      ...pantryItems.map(n => ({ name: n, fromPantry: true })),
+    ];
+  }
+  const pool: { name: string; fromPantry: boolean }[] = [
+    ...items.map(n => ({ name: n, fromPantry: false })),
+    ...pantryItems.map(n => ({ name: n, fromPantry: true })),
+  ];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, items.length);
+}
+
 function MealSectionShuffleable({ title, items, pantryItems = [], Icon, mealKey, spinning, onShuffle, dayNumber, energyLevel, userName, isPastDay, onAILoaded, accentColor }: {
   title: string; items: string[]; pantryItems?: string[]; Icon: LucideIcon;
   mealKey: 'breakfast' | 'lunch' | 'dinner' | 'snack';
@@ -1576,7 +1639,17 @@ function MealSectionShuffleable({ title, items, pantryItems = [], Icon, mealKey,
   isPastDay?: boolean; onAILoaded?: () => void;
   dayNumber: number; energyLevel: EnergyLevel; userName?: string; accentColor?: string;
 }) {
+  const [displaySet, setDisplaySet] = useState(() =>
+    buildDisplaySet(items, pantryItems, getPantryHighlight()),
+  );
+
+  useEffect(() => {
+    setDisplaySet(buildDisplaySet(items, pantryItems, getPantryHighlight()));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
+
   const allFoods = [...(items ?? []), ...pantryItems];
+
   return (
     <div className="mb-3">
       <AIRecipeCard foods={allFoods} mealType={mealKey}
@@ -1602,17 +1675,16 @@ function MealSectionShuffleable({ title, items, pantryItems = [], Icon, mealKey,
           animate={{ opacity: spinning ? 0.35 : 1 }}
           className="flex flex-wrap gap-1.5"
         >
-          {items.map((item, idx) => (
-            <span key={idx}
-              className="text-sm px-3 py-1 rounded-full font-semibold bg-dem-green-100 text-dem-green-700">
-              {item}
-            </span>
-          ))}
-          {pantryItems.map((item, idx) => (
-            <span key={`pantry-${idx}`}
+          {displaySet.map(({ name, fromPantry }, idx) => fromPantry ? (
+            <span key={`${idx}-p`}
               className="text-sm px-3 py-1 rounded-full font-semibold flex items-center gap-1"
               style={{ background: '#fef9c3', color: '#854d0e' }}>
-              🧺 {item}
+              🧺 {name}
+            </span>
+          ) : (
+            <span key={idx}
+              className="text-sm px-3 py-1 rounded-full font-semibold bg-dem-green-100 text-dem-green-700">
+              {name}
             </span>
           ))}
         </motion.div>
@@ -1737,6 +1809,100 @@ function MentalityView({ day, isCompleted, onToggle, onEditPrefs }: {
           Mentality is the glue. Without it, diet and exercise don't stick.
         </p>
       </div>
+    </Card>
+  );
+}
+
+// ─── Habit view ──────────────────────────────────────────────────────────────────
+
+function HabitView({ habit, isCompleted, onToggle, onSaveHabit, isPastDay }: {
+  habit: string;
+  isCompleted: boolean;
+  onToggle: () => void;
+  onSaveHabit: (h: string) => void;
+  isPastDay?: boolean;
+}) {
+  const [editing, setEditing] = useState(!habit);
+  const [draft,   setDraft]   = useState(habit);
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    onSaveHabit(trimmed);
+    setEditing(false);
+  };
+
+  return (
+    <Card>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <div className="flex items-center gap-2 mb-0.5">
+            <Target className="w-5 h-5" style={{ color: '#f97316' }} />
+            <h3 className="text-xl font-black text-gray-900">Habit</h3>
+            {!isPastDay && !editing && habit && (
+              <button
+                onClick={() => { setDraft(habit); setEditing(true); }}
+                className="ml-1 p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                title="Edit habit"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <p className="text-sm font-semibold" style={{ color: '#f97316' }}>Daily commitment</p>
+        </div>
+        {!editing && (
+          <motion.button
+            onClick={!isPastDay ? onToggle : undefined}
+            className="w-11 h-11 rounded-xl flex items-center justify-center border-2 transition-colors"
+            style={{
+              background:  isCompleted ? '#f97316' : 'transparent',
+              borderColor: '#f97316',
+            }}
+            whileTap={!isPastDay ? { scale: 0.9 } : {}}
+          >
+            {isCompleted && <Check className="w-5 h-5 text-white" />}
+          </motion.button>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && commit()}
+            placeholder="e.g. Drink 8 glasses of water"
+            maxLength={80}
+            autoFocus
+            className="w-full rounded-2xl px-4 py-3 text-sm font-semibold text-gray-800 outline-none border-2 transition-colors"
+            style={{ borderColor: draft ? '#f97316' : '#e5e7eb' }}
+          />
+          <motion.button
+            onClick={commit}
+            disabled={!draft.trim()}
+            className="w-full py-3 rounded-2xl text-sm font-black text-white"
+            style={{ background: '#f97316', boxShadow: '0 4px 0 0 #ea580c', opacity: draft.trim() ? 1 : 0.5 }}
+            whileTap={draft.trim() ? { scale: 0.97, y: 2, boxShadow: 'none' } : {}}
+          >
+            Set My Habit
+          </motion.button>
+        </div>
+      ) : (
+        <>
+          <div className="rounded-2xl p-5 mb-3" style={{ background: '#fff7ed', border: '2px solid #fed7aa' }}>
+            <p className="text-lg font-black text-gray-900 text-center leading-snug">{habit}</p>
+          </div>
+          <div className="p-4 rounded-2xl" style={{ background: '#fff7ed', border: '2px solid #fed7aa' }}>
+            <p className="text-sm text-gray-700 font-semibold flex items-center gap-1.5">
+              <Target className="w-4 h-4 flex-shrink-0" style={{ color: '#f97316' }} />
+              Small daily actions compound into big changes.
+            </p>
+          </div>
+        </>
+      )}
     </Card>
   );
 }
