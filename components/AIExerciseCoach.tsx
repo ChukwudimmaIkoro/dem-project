@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dumbbell, Sparkles, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
-import { getCachedExerciseCoach, setCachedExerciseCoach, CachedExerciseCoach } from '@/lib/storage';
+import { getCachedExerciseCoach, setCachedExerciseCoach, CachedExerciseCoach, incrementUserStat } from '@/lib/storage';
+import { hasTreatsLeft, useTreat, getTreatsRemainingToday } from '@/lib/thinkyTreats';
 
 interface AIExerciseCoachProps {
   exerciseId: string;
@@ -28,6 +29,7 @@ export default function AIExerciseCoach({
   const [loading, setLoading]   = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [error, setError]       = useState('');
+  const [treatsLeft, setTreatsLeft] = useState(getTreatsRemainingToday);
 
   const accent = ENERGY_ACCENT[energyLevel];
 
@@ -36,8 +38,17 @@ export default function AIExerciseCoach({
     if (cached) setCoaching(cached);
   }, [exerciseId, energyLevel]);
 
+  useEffect(() => {
+    const refresh = () => setTreatsLeft(getTreatsRemainingToday());
+    window.addEventListener('treats-updated', refresh);
+    return () => window.removeEventListener('treats-updated', refresh);
+  }, []);
+
   const handleGenerate = async () => {
     if (locked) return;
+    if (!hasTreatsLeft()) return;
+    useTreat();
+    setTreatsLeft(getTreatsRemainingToday());
     setLoading(true);
     setError('');
     try {
@@ -50,6 +61,7 @@ export default function AIExerciseCoach({
       if (data.success && data.coaching) {
         setCoaching(data.coaching);
         setCachedExerciseCoach(exerciseId, energyLevel, data.coaching);
+        incrementUserStat('totalExerciseTipsGenerated');
         setExpanded(true);
         onLoaded?.();
       } else {
@@ -91,27 +103,27 @@ export default function AIExerciseCoach({
             {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
         ) : !locked ? (
-          <motion.button
-            onClick={handleGenerate}
-            disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black text-white disabled:opacity-60"
-            style={{
-              background:  accent.color,
-              boxShadow:   loading ? 'none' : `0 3px 0 0 ${accent.shadow}`,
-            }}
-            whileTap={{ scale: 0.95, y: 2, boxShadow: 'none' }}
-          >
-            {loading ? (
-              <motion.div
-                className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full"
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 0.7, ease: 'linear' }}
-              />
-            ) : (
-              <Sparkles className="w-3.5 h-3.5" />
-            )}
-            {loading ? 'Loading...' : 'Get coaching tips'}
-          </motion.button>
+          loading || treatsLeft > 0 ? (
+            <motion.button
+              onClick={handleGenerate}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black text-white disabled:opacity-60"
+              style={{ background: accent.color, boxShadow: loading ? 'none' : `0 3px 0 0 ${accent.shadow}` }}
+              whileTap={{ scale: 0.95, y: 2, boxShadow: 'none' }}
+            >
+              {loading ? (
+                <motion.div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full"
+                  animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.7, ease: 'linear' }} />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5" />
+              )}
+              {loading ? 'Loading...' : `🍬 Coach · ${treatsLeft} treat${treatsLeft !== 1 ? 's' : ''} left`}
+            </motion.button>
+          ) : (
+            <span className="text-xs font-black px-2 py-1 rounded-lg bg-amber-50 text-amber-600 border border-amber-200">
+              🍬 Out of Treats! Resets tomorrow.
+            </span>
+          )
         ) : null}
       </div>
 

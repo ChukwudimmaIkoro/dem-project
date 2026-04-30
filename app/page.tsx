@@ -4,7 +4,9 @@ import { useEffect, useState, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { loadAppState, saveUserProfile, saveCurrentPlan, clearAppState } from '@/lib/storage';
-import { loadUserProfile, loadActivePlan } from '@/lib/supabaseStorage';
+import { loadUserProfile, loadActivePlan, loadPantryFromCloud, loadTreatsFromCloud, syncTreats } from '@/lib/supabaseStorage';
+import { savePantry } from '@/lib/pantry';
+import { restoreTreatsFromCloud, clearTreatsLocally } from '@/lib/thinkyTreats';
 import { restoreTutorialsSeen } from '@/hooks/useTutorial';
 import AuthScreen from '@/components/AuthScreen';
 import OnboardingFlow from '@/components/OnboardingFlow';
@@ -18,7 +20,7 @@ function LoadingScreen() {
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(160deg, #f0fdf4 0%, #eff6ff 100%)' }}>
       <div className="text-center">
         <div className="text-6xl mb-4">💪</div>
-        <h1 className="text-3xl font-black text-dem-green-600">Dem V2</h1>
+        <h1 className="text-3xl font-black text-dem-green-600">Dem+</h1>
         <p className="text-gray-500 mt-2 text-sm">Loading...</p>
       </div>
     </div>
@@ -36,22 +38,28 @@ export default function Home() {
 
     // Restore cloud data → localStorage. Use allSettled so a Supabase hiccup on one
     // call doesn't block the others or leave the user stuck on the loading screen.
-    const [userResult, planResult] = await Promise.allSettled([
+    const [userResult, planResult, , pantryResult, treatsResult] = await Promise.allSettled([
       loadUserProfile(),
       loadActivePlan(),
       restoreTutorialsSeen(),
+      loadPantryFromCloud(),
+      loadTreatsFromCloud(),
     ]);
-    const cloudUser = userResult.status === 'fulfilled' ? userResult.value : null;
-    const cloudPlan = planResult.status === 'fulfilled' ? planResult.value : null;
+    const cloudUser   = userResult.status   === 'fulfilled' ? userResult.value   : null;
+    const cloudPlan   = planResult.status   === 'fulfilled' ? planResult.value   : null;
+    const cloudPantry = pantryResult.status === 'fulfilled' ? pantryResult.value : null;
+    const cloudTreats = treatsResult.status === 'fulfilled' ? treatsResult.value : null;
     if (cloudUser) {
-      // Preserve longestStreak from localStorage — take the higher of cloud vs local.
       const localState = loadAppState();
       saveUserProfile({
         ...cloudUser,
         longestStreak: Math.max(cloudUser.longestStreak ?? 0, localState.user?.longestStreak ?? 0),
       });
     }
-    if (cloudPlan) saveCurrentPlan(cloudPlan);
+    if (cloudPlan)   saveCurrentPlan(cloudPlan);
+    if (cloudPantry) savePantry(cloudPantry);
+    clearTreatsLocally();
+    if (cloudTreats) restoreTreatsFromCloud(cloudTreats);
 
     // Cloud plan is authoritative — don't let stale localStorage skip onboarding for new users
     setScreen(cloudPlan ? 'app' : 'onboarding');
@@ -95,7 +103,13 @@ export default function Home() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    const syncOnUse = () => syncTreats().catch(() => {});
+    window.addEventListener('treats-updated', syncOnUse);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('treats-updated', syncOnUse);
+    };
   }, [bootstrap, initAuth]);
 
   if (screen === 'loading') return <LoadingScreen />;

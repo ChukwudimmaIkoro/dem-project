@@ -1,9 +1,6 @@
 import { useRef } from 'react';
 
-/**
- * Enables click-and-drag horizontal scrolling on desktop.
- * On mobile, native touch scroll already works — this only adds mouse drag.
- */
+// Adds click-and-drag horizontal scrolling on desktop (mobile uses native touch scroll)
 export function useDragScroll() {
   const ref       = useRef<HTMLDivElement>(null);
   const dragging  = useRef(false);

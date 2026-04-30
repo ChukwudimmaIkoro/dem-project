@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 
 const LS_KEY = 'dem-tutorial-seen';
 
-// ── Local helpers ────────────────────────────────────────────────────────────
+// Local helpers
 
 function getSeenLocal(): Set<string> {
   if (typeof window === 'undefined') return new Set();
@@ -21,7 +21,7 @@ function saveSeenLocal(seen: Set<string>): void {
   catch { /* ignore */ }
 }
 
-// ── Cloud sync ───────────────────────────────────────────────────────────────
+// Cloud sync
 
 async function syncSeenToCloud(key: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -35,7 +35,7 @@ async function syncSeenToCloud(key: string): Promise<void> {
     .eq('id', user.id);
 }
 
-// ── Public: clear all seen tutorials (on plan reset) ────────────────────────
+// Clears all seen tutorials locally and in Supabase (called on plan reset)
 
 export async function clearTutorialsSeen(): Promise<void> {
   if (typeof window !== 'undefined') {
@@ -49,7 +49,7 @@ export async function clearTutorialsSeen(): Promise<void> {
     .eq('id', user.id);
 }
 
-// ── Public: pull cloud seen-set into localStorage on login ───────────────────
+// Pulls cloud seen-set into localStorage on login
 
 export async function restoreTutorialsSeen(): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -65,13 +65,8 @@ export async function restoreTutorialsSeen(): Promise<void> {
   saveSeenLocal(merged);
 }
 
-// ── Hook ─────────────────────────────────────────────────────────────────────
-
 export function useTutorial(pageKey: string): { shouldShow: boolean; dismiss: () => void } {
-  // Lazy initializer reads localStorage synchronously on first render.
-  // Because bootstrap() awaits restoreTutorialsSeen() before calling setScreen('app'),
-  // the cloud-restored seen-set is already in localStorage by the time this runs.
-  // This avoids any render cycle where shouldShow briefly flips true → false.
+  // Lazy initializer reads localStorage synchronously so shouldShow never flips true then false
   const [shouldShow, setShouldShow] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return !getSeenLocal().has(pageKey);

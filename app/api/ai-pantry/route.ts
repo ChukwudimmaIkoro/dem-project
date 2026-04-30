@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 
 export async function POST(req: NextRequest) {
   try {
-    const { foods, mealType, energyLevel, userName } = await req.json();
+    const { pantryItems, energyLevel, userName } = await req.json();
 
     const complexityGuide = energyLevel === 'low'
       ? 'Very simple, minimal prep. Under 10 minutes. No cooking if possible.'
@@ -11,27 +11,25 @@ export async function POST(req: NextRequest) {
       ? 'Moderate prep, 15-20 minutes. Simple cooking allowed.'
       : 'Can be more involved, 20-30 minutes. Optimize for nutrition and macros.';
 
-    const prompt = `Create a realistic home-cooked ${mealType} recipe. Think: something a regular person would actually make and enjoy on a weeknight, not a restaurant dish.
+    const prompt = `You are a culinary expert and nutritionist. ${userName ? `You're cooking for ${userName}.` : ''} Create a practical, delicious meal using ONLY ingredients the user already has at home.
 
-Available ingredients (use what fits): ${foods.join(', ')}
+Pantry items available: ${pantryItems.join(', ')}
 
-Energy level: ${energyLevel} — ${complexityGuide}
+Energy level today: ${energyLevel} — ${complexityGuide}
 
-Skew toward common, recognizable meals. A chicken and rice bowl, a simple pasta, scrambled eggs with toast, a basic salad — these are good. Obscure fusion dishes or elaborate techniques are not.
+You may assume the user has basic pantry staples (salt, pepper, oil, water) even if not listed. Use only what's in the pantry list plus those staples. Do NOT suggest going to the store.
 
 Produce ONLY this JSON, no other text:
 {
-  "name": "Recipe name (simple and descriptive)",
-  "tagline": "One plain sentence describing the dish",
+  "name": "Recipe name (creative, appetizing)",
+  "tagline": "One sentence describing the dish",
   "prepTime": "X minutes",
   "ingredients": [
-    {"item": "ingredient name", "amount": "realistic quantity with units"},
     {"item": "ingredient name", "amount": "realistic quantity with units"}
   ],
   "steps": [
     "Clear, specific step",
-    "Next step",
-    "Final step"
+    "Next step"
   ],
   "nutrition": {
     "protein": "Xg",
@@ -39,10 +37,10 @@ Produce ONLY this JSON, no other text:
     "fats": "Xg",
     "calories": "~XXX"
   },
-  "tip": "One short practical tip"
+  "tip": "A pro technique or substitution tip"
 }
 
-Use 4-7 ingredients. Quantities must be realistic (e.g. '2 cups', '1 tbsp', '3 oz'). Steps must be actionable and specific.`;
+Use only ingredients from the pantry list (plus salt/pepper/oil/water). Quantities must be realistic. Steps must be actionable. Make it genuinely good.`;
 
     const message = await callClaude({
       max_tokens: 900,
@@ -57,11 +55,7 @@ Use 4-7 ingredients. Quantities must be realistic (e.g. '2 cups', '1 tbsp', '3 o
 
     return Response.json({ recipe, success: true });
   } catch (error) {
-    console.error('AI meal error:', error);
-    return Response.json({
-      recipe: null,
-      success: false,
-      fallback: true,
-    });
+    console.error('AI pantry error:', error);
+    return Response.json({ recipe: null, success: false });
   }
 }

@@ -15,10 +15,196 @@ interface MascotProps {
   dayNumber?: number;
   completedTasks?: string[];
   streak?: number;
-  pillar?: 'diet' | 'exercise' | 'mentality';
+  pillar?: 'diet' | 'exercise' | 'mentality' | 'habit';
   size?: number; // SVG rendered size in px (default 96)
   suppressBubble?: boolean; // hide speech bubble entirely (used in tutorial overlay)
+  hat?: string;
+  eyewear?: string;
+  badge?: string;
 }
+
+// ─── Hat definitions ─────────────────────────────────────────────────────────────
+
+export interface MascotHat {
+  id: string;
+  name: string;
+  emoji: string;
+  svgPath: React.ReactNode;
+}
+
+export const MASCOT_HATS: MascotHat[] = [
+  {
+    id: 'party',
+    name: 'Party Hat',
+    emoji: '🎉',
+    svgPath: (
+      <g>
+        <polygon points="50,2 30,38 70,38" fill="#f97316" />
+        <polygon points="50,2 38,22 62,22" fill="#fbbf24" />
+        <circle cx="50" cy="2" r="3" fill="#f43f5e" />
+        <ellipse cx="50" cy="38" rx="21" ry="5" fill="#fb923c" />
+      </g>
+    ),
+  },
+  {
+    id: 'crown',
+    name: 'Crown',
+    emoji: '👑',
+    svgPath: (
+      <g>
+        <polygon points="29,38 29,20 38,30 50,10 62,30 71,20 71,38" fill="#fbbf24" stroke="#f59e0b" strokeWidth="1.5" />
+        <circle cx="50" cy="11" r="3.5" fill="#f43f5e" />
+        <circle cx="29" cy="20" r="2.5" fill="#60a5fa" />
+        <circle cx="71" cy="20" r="2.5" fill="#34d399" />
+      </g>
+    ),
+  },
+  {
+    id: 'beanie',
+    name: 'Beanie',
+    emoji: '🧢',
+    svgPath: (
+      <g>
+        <ellipse cx="50" cy="38" rx="22" ry="6" fill="#6366f1" />
+        <path d="M28,38 Q28,10 50,10 Q72,10 72,38" fill="#818cf8" />
+        <circle cx="50" cy="11" r="4" fill="#f43f5e" />
+        <line x1="28" y1="32" x2="72" y2="32" stroke="#4f46e5" strokeWidth="2.5" />
+      </g>
+    ),
+  },
+  {
+    id: 'tophat',
+    name: 'Top Hat',
+    emoji: '🎩',
+    svgPath: (
+      <g>
+        <rect x="34" y="12" width="32" height="26" rx="3" fill="#1e293b" />
+        <rect x="26" y="36" width="48" height="6" rx="3" fill="#334155" />
+        <rect x="38" y="14" width="24" height="4" rx="1" fill="#64748b" opacity="0.4" />
+      </g>
+    ),
+  },
+  {
+    id: 'bow',
+    name: 'Bow',
+    emoji: '🎀',
+    svgPath: (
+      <g>
+        <ellipse cx="38" cy="28" rx="10" ry="7" fill="#f9a8d4" />
+        <ellipse cx="62" cy="28" rx="10" ry="7" fill="#f9a8d4" />
+        <circle cx="50" cy="28" r="5" fill="#ec4899" />
+        <ellipse cx="38" cy="28" rx="10" ry="7" fill="none" stroke="#ec4899" strokeWidth="1.2" />
+        <ellipse cx="62" cy="28" rx="10" ry="7" fill="none" stroke="#ec4899" strokeWidth="1.2" />
+      </g>
+    ),
+  },
+];
+
+// ─── Eyewear definitions ─────────────────────────────────────────────────────────
+
+export interface MascotEyewear {
+  id: string;
+  name: string;
+  emoji: string;
+  svgPath: React.ReactNode;
+}
+
+export const MASCOT_EYEWEAR: MascotEyewear[] = [
+  {
+    id: 'sunglasses',
+    name: 'Sunglasses',
+    emoji: '🕶️',
+    svgPath: (
+      <g>
+        <rect x="25" y="38" width="19" height="13" rx="4" fill="#111827" opacity="0.92" />
+        <rect x="56" y="38" width="19" height="13" rx="4" fill="#111827" opacity="0.92" />
+        <line x1="44" y1="44" x2="56" y2="44" stroke="#4b5563" strokeWidth="2" strokeLinecap="round" />
+        <line x1="25" y1="43" x2="15" y2="46" stroke="#4b5563" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="74" y1="43" x2="85" y2="46" stroke="#4b5563" strokeWidth="1.5" strokeLinecap="round" />
+        <ellipse cx="30" cy="41" rx="4" ry="2.5" fill="rgba(255,255,255,0.16)" />
+        <ellipse cx="61" cy="41" rx="4" ry="2.5" fill="rgba(255,255,255,0.16)" />
+      </g>
+    ),
+  },
+  {
+    id: 'heart_glasses',
+    name: 'Heart Glasses',
+    emoji: '🩷',
+    svgPath: (
+      <g>
+        <circle cx="34" cy="44" r="9" fill="#fda4af" opacity="0.78" />
+        <circle cx="34" cy="44" r="9" fill="none" stroke="#f43f5e" strokeWidth="1.5" />
+        <circle cx="66" cy="44" r="9" fill="#fda4af" opacity="0.78" />
+        <circle cx="66" cy="44" r="9" fill="none" stroke="#f43f5e" strokeWidth="1.5" />
+        <line x1="43" y1="44" x2="57" y2="44" stroke="#f43f5e" strokeWidth="2" strokeLinecap="round" />
+        <line x1="25" y1="43" x2="15" y2="46" stroke="#f43f5e" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="74" y1="43" x2="85" y2="46" stroke="#f43f5e" strokeWidth="1.5" strokeLinecap="round" />
+      </g>
+    ),
+  },
+  {
+    id: 'round_glasses',
+    name: 'Round Glasses',
+    emoji: '👓',
+    svgPath: (
+      <g>
+        <circle cx="34" cy="44" r="9" fill="rgba(219,234,254,0.25)" stroke="#92400e" strokeWidth="2" />
+        <circle cx="66" cy="44" r="9" fill="rgba(219,234,254,0.25)" stroke="#92400e" strokeWidth="2" />
+        <line x1="43" y1="44" x2="57" y2="44" stroke="#92400e" strokeWidth="2" strokeLinecap="round" />
+        <line x1="25" y1="43" x2="15" y2="46" stroke="#92400e" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="74" y1="43" x2="85" y2="46" stroke="#92400e" strokeWidth="1.5" strokeLinecap="round" />
+      </g>
+    ),
+  },
+];
+
+// ─── Badge definitions ────────────────────────────────────────────────────────────
+
+export interface MascotBadge {
+  id: string;
+  name: string;
+  emoji: string;
+  svgPath: React.ReactNode;
+}
+
+export const MASCOT_BADGES: MascotBadge[] = [
+  {
+    id: 'heart_badge',
+    name: 'Heart',
+    emoji: '❤️',
+    svgPath: (
+      <g>
+        <circle cx="74" cy="70" r="9" fill="white" />
+        <circle cx="74" cy="70" r="9" fill="none" stroke="#fca5a5" strokeWidth="1.5" />
+        <text x="74" y="75" textAnchor="middle" fontSize="10" fill="#ef4444">♥</text>
+      </g>
+    ),
+  },
+  {
+    id: 'star_badge',
+    name: 'Star',
+    emoji: '⭐',
+    svgPath: (
+      <g>
+        <circle cx="74" cy="70" r="9" fill="white" />
+        <circle cx="74" cy="70" r="9" fill="none" stroke="#fcd34d" strokeWidth="1.5" />
+        <text x="74" y="75" textAnchor="middle" fontSize="10" fill="#f59e0b">★</text>
+      </g>
+    ),
+  },
+  {
+    id: 'bolt_badge',
+    name: 'Lightning',
+    emoji: '⚡',
+    svgPath: (
+      <g>
+        <circle cx="74" cy="70" r="9" fill="white" />
+        <circle cx="74" cy="70" r="9" fill="none" stroke="#c7d2fe" strokeWidth="1.5" />
+        <polygon points="76,63 70,71 74.5,71 72,77 80,69 75.5,69" fill="#6366f1" />
+      </g>
+    ),
+  },
+];
 
 // ─── Energy configuration ───────────────────────────────────────────────────────
 
@@ -212,6 +398,9 @@ export default function Mascot({
   userName = '',
   size = 96,
   suppressBubble = false,
+  hat,
+  eyewear,
+  badge,
 }: MascotProps) {
   const bodyControls   = useAnimationControls(); // bounce physics
   const wrapperControls = useAnimationControls(); // energy zoom
@@ -281,7 +470,7 @@ export default function Mascot({
     }
   }, [currentEnergy, wrapperControls]);
 
-  // ── Bounce loop — restarts cleanly when energy changes ──────────────────────
+  // Bounce loop
   useEffect(() => {
     loopActive.current = true;
     energyRef.current  = currentEnergy;
@@ -460,6 +649,13 @@ export default function Mascot({
                     <ellipse cx="75" cy="56" rx="7" ry="4.5" fill="rgba(255,150,150,0.35)" />
                   </>
                 )}
+
+                {/* Hat layer */}
+                {hat && MASCOT_HATS.find(h => h.id === hat)?.svgPath}
+                {/* Eyewear layer */}
+                {eyewear && MASCOT_EYEWEAR.find(e => e.id === eyewear)?.svgPath}
+                {/* Badge layer */}
+                {badge && MASCOT_BADGES.find(b => b.id === badge)?.svgPath}
               </svg>
             </motion.div>
           </div>

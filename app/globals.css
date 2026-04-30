@@ -8,7 +8,7 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Prevent iOS Safari from auto-zooming on input focus (requires font-size >= 16px) */
+  /* Prevents iOS Safari auto-zoom on input focus */
   input, select, textarea {
     font-size: 16px;
   }
@@ -30,7 +30,6 @@
     @apply min-h-[44px] min-w-[44px];
   }
 
-  /* Duolingo-style bottom border on cards for depth */
   .card-3d {
     box-shadow: 0 4px 0 0 rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
   }
@@ -39,7 +38,6 @@
     transform: translateY(3px);
   }
 
-  /* Duolingo-style button with bottom border for 3D effect */
   .btn-3d {
     box-shadow: 0 5px 0 0 rgba(0,0,0,0.18);
     transition: box-shadow 80ms ease, transform 80ms ease;
@@ -50,7 +48,6 @@
   }
 }
 
-/* Keyframes kept for fallback use */
 @keyframes fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
