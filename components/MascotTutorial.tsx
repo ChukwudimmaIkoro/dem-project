@@ -42,7 +42,6 @@ export default function MascotTutorial({ slides, onDismiss }: MascotTutorialProp
         exit={{ scale: 0.9, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 280, damping: 22, delay: 0.1 }}
       >
-        {/* Mascot — no speech bubble (tutorial card handles all text) */}
         <Mascot
           currentEnergy="medium"
           mood="happy"

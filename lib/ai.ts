@@ -1,7 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-// Model preference order, primary first then fallback.
-// If the primary model is unavailable (404/400) the next one is tried automatically.
+// Primary model with automatic fallback on 404/400
 const MODEL_PREFERENCE = [
   'claude-sonnet-4-6',
   'claude-haiku-4-5-20251001',
@@ -15,10 +14,6 @@ interface MessageParams {
   system?: string;
 }
 
-/**
- * Call Anthropic with automatic model fallback.
- * If the preferred model is deprecated/not found (404 or 400), the next one is tried.
- */
 export async function callClaude(params: MessageParams): Promise<Anthropic.Message> {
   let lastError: unknown;
 

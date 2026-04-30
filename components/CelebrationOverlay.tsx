@@ -94,7 +94,6 @@ export function CelebrationOverlay({ state, onDismiss }: CelebrationOverlayProps
       className={`fixed inset-0 z-[200] flex flex-col items-center justify-center px-6 gap-0 ${isExiting ? styles.overlayExit : styles.backdrop}`}
       style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
     >
-      {/* Mascot — says the subtext, floats above the card like MascotTutorial */}
       <div className={styles.iconPop}>
         <Mascot
           message={subtext}

@@ -51,6 +51,7 @@ export default function PrivacyPage() {
       <div className="text-center pb-8 text-xs text-gray-400 space-x-4">
         <Link href="/privacy" className="hover:text-gray-600">Privacy Policy</Link>
         <Link href="/terms" className="hover:text-gray-600">Terms of Service</Link>
+        <Link href="/press" className="hover:text-gray-600">Press Kit</Link>
       </div>
     </div>
   );

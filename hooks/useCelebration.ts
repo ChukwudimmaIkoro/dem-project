@@ -18,8 +18,7 @@ export function useCelebration(): {
   dismissCelebration: () => void;
 } {
   const [celebrationProps, setCelebrationProps] = useState<CelebrationOverlayProps | null>(null);
-  // Incrementing key forces a React remount if triggerCelebration fires while overlay is open,
-  // so the animation sequence always restarts cleanly from the beginning.
+  // Incrementing key forces remount if triggered while overlay is open, restarting animation
   const counterRef = useRef(0);
   const [celebrationKey, setCelebrationKey] = useState(0);
 

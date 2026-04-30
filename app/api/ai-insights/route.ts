@@ -5,11 +5,9 @@ export async function POST(req: NextRequest) {
   try {
     const { energyHistory, completionHistory, userName, streak } = await req.json();
 
-    // Rule-based detection first (fast, no API needed)
     const alerts = [];
     const displayName = userName || 'Patient';
 
-    // 3+ consecutive low energy days = clinical flag
     if (energyHistory.length >= 3 && energyHistory.slice(-3).every((e: string) => e === 'low')) {
       alerts.push({
         severity: 'MEDIUM',
@@ -19,7 +17,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // All tasks missed for 2+ days
     const recentCompletion = completionHistory.slice(-2);
     const allMissed = recentCompletion.every((day: any) =>
       !day.diet && !day.exercise && !day.mentality
@@ -33,7 +30,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Generate AI narrative insight
     const prompt = `You are an AI health analyst for a hospital care team. Analyze this patient data and provide a brief clinical observation.
 
 Patient: ${displayName}

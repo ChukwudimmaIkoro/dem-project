@@ -66,7 +66,6 @@ export default function FloatingMascot({
         )}
       </AnimatePresence>
 
-      {/* Widget — positioned just inside the right edge of the content column */}
       <div
         className="fixed z-[46] flex flex-col items-end gap-2"
         style={{

@@ -154,20 +154,21 @@ export default function WaitlistLanding({ onContinueToAlpha }: WaitlistLandingPr
         </motion.div>
       </div>
 
-      {/* Continue to alpha — bottom */}
-      <motion.div
-        className="mt-10 text-center"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.4 }}
-      >
-        <button
-          onClick={onContinueToAlpha}
-          className="text-xs text-gray-400 hover:text-gray-600 font-semibold underline underline-offset-2 transition-colors"
+      {process.env.NODE_ENV === 'development' && (
+        <motion.div
+          className="mt-10 text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
         >
-          Continue to alpha build →
-        </button>
-      </motion.div>
+          <button
+            onClick={onContinueToAlpha}
+            className="text-xs text-gray-400 hover:text-gray-600 font-semibold underline underline-offset-2 transition-colors"
+          >
+            Continue to alpha build →
+          </button>
+        </motion.div>
+      )}
     </div>
   );
 }
