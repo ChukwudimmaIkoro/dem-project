@@ -30,11 +30,19 @@ export interface CachedExerciseCoach {
   searchQuery: string;
 }
 
+export interface CachedMentalityGuide {
+  rationale: string;
+  steps: string[];
+  noticePrompt: string;
+  whenToUse: string;
+}
+
 export interface AICache {
   planId: string;
   recipes: Record<string, CachedRecipe>;
   insights: Record<string, CachedInsight>;
   exercises: Record<string, CachedExerciseCoach>;
+  mentality?: Record<string, CachedMentalityGuide>;
 }
 
 // App State
@@ -156,9 +164,31 @@ export function setCachedExerciseCoach(exerciseId: string, energyLevel: string, 
   saveAICache(cache);
 }
 
+export function getCachedMentalityGuide(checkId: string, energyLevel: string): CachedMentalityGuide | null {
+  const cache = loadAICache();
+  return (cache.mentality ?? {})[`${checkId}-${energyLevel}`] ?? null;
+}
+
+export function setCachedMentalityGuide(checkId: string, energyLevel: string, guide: CachedMentalityGuide): void {
+  const cache = loadAICache();
+  if (!cache.mentality) cache.mentality = {};
+  cache.mentality[`${checkId}-${energyLevel}`] = guide;
+  saveAICache(cache);
+}
+
 export function clearAppState(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(ENERGY_MODAL_KEY);
   // AI cache preserved intentionally — validated by planId on load
+}
+
+export function incrementUserStat(
+  field: 'totalDaysCompleted' | 'totalRecipesGenerated' | 'totalExerciseTipsGenerated'
+): void {
+  const state = loadAppState();
+  if (!state.user) return;
+  state.user = { ...state.user, [field]: (state.user[field] ?? 0) + 1 };
+  saveAppState(state);
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('user-stat-updated'));
 }

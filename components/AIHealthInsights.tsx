@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, TrendingUp, TrendingDown, Minus, AlertTriangle, Sparkles, ChevronDown, Stethoscope, ShieldCheck } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, Minus, AlertTriangle, Sparkles, ChevronDown, Stethoscope, ShieldCheck, Copy, Check as CheckIcon } from 'lucide-react';
 import { getCachedInsight, setCachedInsight, CachedInsight } from '@/lib/storage';
 import { hasTreatsLeft, useTreat, getTreatsRemainingToday } from '@/lib/thinkyTreats';
 
@@ -34,11 +34,18 @@ export default function AIHealthInsights({
   const [showCareNote, setShowCareNote]           = useState(false);
   const [showIncompleteWarning, setShowIncompleteWarning] = useState(false);
   const [treatsLeft, setTreatsLeft]               = useState(() => getTreatsRemainingToday());
+  const [copiedReport, setCopiedReport]           = useState(false);
 
   useEffect(() => {
     const cached = getCachedInsight(currentDayNumber);
     if (cached) setInsight(cached);
   }, [currentDayNumber]);
+
+  useEffect(() => {
+    const refresh = () => setTreatsLeft(getTreatsRemainingToday());
+    window.addEventListener('treats-updated', refresh);
+    return () => window.removeEventListener('treats-updated', refresh);
+  }, []);
 
   const currentDayCompletion = completionHistory[currentDayNumber - 1];
   const dayIsComplete = !!(
@@ -146,9 +153,9 @@ export default function AIHealthInsights({
               </div>
             </div>
 
-          {treatsLeft === 0 ? (
+          {!loading && treatsLeft === 0 ? (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-amber-50 border border-amber-200 text-amber-700">
-              🍬 Out of treats — resets tomorrow
+              🍬 Out of Treats! Resets tomorrow.
             </div>
           ) : (
             <motion.button
@@ -188,7 +195,7 @@ export default function AIHealthInsights({
                     exit={{ opacity: 0 }}
                   >
                     <Sparkles className="w-3 h-3" />
-                    {insight ? 'Refresh' : 'Analyze'} · {treatsLeft} treat{treatsLeft !== 1 ? 's' : ''} left
+                    🍬 {insight ? 'Refresh' : 'Analyze'} · {treatsLeft} treat{treatsLeft !== 1 ? 's' : ''} left
                   </motion.span>
                 )}
               </AnimatePresence>
@@ -347,6 +354,57 @@ export default function AIHealthInsights({
                     No personally identifiable data is sent to third parties without your consent. This summary is stored on your device only.
                   </p>
                 </div>
+
+                {/* Share Care Report */}
+                <motion.button
+                  onClick={() => {
+                    const TREND_LABELS: Record<string, string> = {
+                      improving: 'Improving', stable: 'Stable',
+                      declining: 'Declining', insufficient_data: 'Insufficient Data',
+                    };
+                    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                    const alertLines = (insight.alerts ?? []).map(
+                      a => `  [${a.severity}] ${a.message}: ${a.recommendation}`
+                    ).join('\n');
+                    const report = [
+                      `HEALTH SUMMARY — ${date}`,
+                      userName ? `Patient: ${userName}` : 'Patient: Anonymous',
+                      '',
+                      `TREND: ${TREND_LABELS[insight.trend] ?? insight.trend}`,
+                      '',
+                      'OBSERVATIONS:',
+                      insight.insight,
+                      '',
+                      'PATIENT MESSAGE:',
+                      insight.patientMessage,
+                      '',
+                      'CLINICAL NOTE:',
+                      insight.careNote,
+                      ...(alertLines ? ['', 'CLINICAL FLAGS:', alertLines] : []),
+                      '',
+                      'DISCLAIMER:',
+                      'No personally identifiable data was sent to third parties. This summary was generated from self-reported data. If your doctor recommended a personalized health plan, share this summary at your next visit.',
+                    ].join('\n');
+                    navigator.clipboard.writeText(report).then(() => {
+                      setCopiedReport(true);
+                      setTimeout(() => setCopiedReport(false), 2500);
+                    });
+                  }}
+                  className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black"
+                  style={{
+                    background: copiedReport ? '#f0fdf4' : '#f8fafc',
+                    border: `1.5px solid ${copiedReport ? '#86efac' : '#e2e8f0'}`,
+                    color: copiedReport ? '#16a34a' : '#64748b',
+                  }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                >
+                  {copiedReport ? (
+                    <><CheckIcon className="w-3.5 h-3.5" /> Copied to clipboard!</>
+                  ) : (
+                    <><Copy className="w-3.5 h-3.5" /> Share Care Report</>
+                  )}
+                </motion.button>
               </motion.div>
             )}
           </AnimatePresence>

@@ -29,10 +29,13 @@ export interface Exercise {
 export type MentalityType = 'affirmation' | 'breathing' | 'reflection' | 'gratitude' | 'meditation';
 export type MentalityPillar = 'mindfulness' | 'physical' | 'emotional' | 'sensory';
 
+export type MentalityProtocol = 'CBT' | 'DBT' | 'Somatic' | 'Positive Psychology';
+
 export interface MentalityCheck {
   id: string;
   type: MentalityType;
   pillar: MentalityPillar;
+  protocol: MentalityProtocol;
   emoji: string;
   title: string;
   content: string;
@@ -41,6 +44,8 @@ export interface MentalityCheck {
 
 
 // User Data:
+
+export type SubscriptionTier = 'basic' | 'ad_free' | 'premium' | 'premium_plus';
 
 export interface UserProfile {
   name: string;
@@ -53,7 +58,11 @@ export interface UserProfile {
   noMentalityPreference?: boolean; // true = skip mentality selection
   longestStreak?: number;          // highest streak ever reached — never reset on streak loss
   demPlusHabit?: string;           // Dem+ single habit the user is building
-  mascotItems?: string[];          // owned mascot cosmetic item IDs
+  mascotItems?: string[];          // [hatId, eyewearId, badgeId] — any slot can be ''
+  subscriptionTier?: SubscriptionTier;
+  totalDaysCompleted?: number;
+  totalRecipesGenerated?: number;
+  totalExerciseTipsGenerated?: number;
   createdAt: string;
 }
 

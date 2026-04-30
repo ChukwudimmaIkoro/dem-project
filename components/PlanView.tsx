@@ -6,6 +6,7 @@ import { ThreeDayPlan, DayPlan, EnergyLevel } from '@/types';
 import {
   loadAppState, updatePlan, clearAppState,
   saveCurrentPlan, saveUserProfile, hasShownEnergyModal, saveEnergyModalShown,
+  incrementUserStat,
 } from '@/lib/storage';
 import { syncPlan, syncUserProfile, deactivateCloudPlan } from '@/lib/supabaseStorage';
 import { supabase } from '@/lib/supabase';
@@ -32,6 +33,7 @@ import Mascot from './Mascot';
 import AIRecipeCard from './AIRecipeCard';
 import AIHealthInsights from './AIHealthInsights';
 import AIExerciseCoach from './AIExerciseCoach';
+import AIMentalityGuide from './AIMentalityGuide';
 import PreferencesModal from './PreferencesModal';
 import FloatingMascot from './FloatingMascot';
 import { useDragScroll } from '@/hooks/useDragScroll';
@@ -42,7 +44,7 @@ import DemPlusHabitInput from './DemPlusHabitInput';
 import PantryTab from './PantryTab';
 import WardrobeSelector from './WardrobeSelector';
 import { getPantryForMeal, getPantryHighlight } from '@/lib/pantry';
-import { getTreatsRemainingToday, FREE_DAILY_LIMIT } from '@/lib/thinkyTreats';
+import { getTreatsRemainingToday, FREE_DAILY_LIMIT, getEffectiveDailyLimit, devResetTreats } from '@/lib/thinkyTreats';
 
 // ─── Mascot message pools ────────────────────────────────────────────────────────
 
@@ -142,6 +144,8 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const [energySetMessage, setEnergySetMessage] = useState('');
   const [tickleMessage,   setTickleMessage]   = useState('');
   const [tabMessage,      setTabMessage]      = useState('');
+  const [treatEatMessage, setTreatEatMessage] = useState('');
+  const [showTreatBrains, setShowTreatBrains] = useState(false);
   const [lastPillar,      setLastPillar]      = useState<'diet' | 'exercise' | 'mentality' | 'habit'>('diet');
   const [userName,        setUserName]        = useState('');
   const [userFoods,       setUserFoods]       = useState<string[]>([]);
@@ -155,7 +159,9 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const [showDevPanel, setShowDevPanel] = useState(false);
 
   // Preferences editing
-  const [editingPrefs, setEditingPrefs] = useState<'diet' | 'exercise' | 'mentality' | null>(null);
+  const [editingPrefs,    setEditingPrefs]   = useState<'diet' | 'exercise' | 'mentality' | null>(null);
+  const [demPlusHabit,    setDemPlusHabit]   = useState(() => loadAppState().user?.demPlusHabit ?? '');
+  const [mascotItems,     setMascotItems]    = useState(() => loadAppState().user?.mascotItems ?? []);
 
   const [devUnlocked,  setDevUnlocked]  = useState(DEV_MODE);
   const konamiProgress = useRef(0);
@@ -205,6 +211,29 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     };
     window.addEventListener('keydown', handleKonami);
     return () => window.removeEventListener('keydown', handleKonami);
+  }, []);
+
+  useEffect(() => {
+    const YUM = ['Yum! 🧠', 'Delicious!', 'Brain fuel!', 'Mmm! 🧠', 'So good!'];
+    const onTreatConsumed = () => {
+      const msg = YUM[Math.floor(Math.random() * YUM.length)];
+      setTreatEatMessage(msg);
+      setShowTreatBrains(true);
+      setTimeout(() => setTreatEatMessage(''), 2500);
+      setTimeout(() => setShowTreatBrains(false), 2800);
+    };
+    window.addEventListener('treat-consumed', onTreatConsumed);
+    return () => window.removeEventListener('treat-consumed', onTreatConsumed);
+  }, []);
+
+  // Sync user stats to Supabase whenever a stat is incremented locally
+  useEffect(() => {
+    const onStatUpdated = () => {
+      const state = loadAppState();
+      if (state.user) syncUserProfile(state.user).catch(() => {});
+    };
+    window.addEventListener('user-stat-updated', onStatUpdated);
+    return () => window.removeEventListener('user-stat-updated', onStatUpdated);
   }, []);
 
   // Background sync — every plan state change writes to Supabase (fire and forget).
@@ -372,6 +401,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
 
     const nowComplete = isDayComplete(updatedDays[currentDayIndex]);
     if (nowComplete && !wasComplete) {
+      incrementUserStat('totalDaysCompleted');
       const prevDone = currentDayIndex === 0 || isDayComplete(updatedDays[currentDayIndex - 1]);
       if (prevDone) {
         // Compute updated streak to decide celebration type
@@ -603,6 +633,26 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                   <div className="text-[11px] text-gray-400 font-semibold mt-0.5">Longest Streak</div>
                 </div>
               </div>
+              {/* Lifetime stats */}
+              {(() => {
+                const u = loadAppState().user;
+                return (
+                  <div className="grid grid-cols-3 gap-2 mb-2">
+                    <div className="rounded-xl p-2 text-center" style={{ background: '#f9fafb', border: '1.5px solid #e5e7eb' }}>
+                      <div className="text-xl font-black" style={{ color: theme.accent }}>{u?.totalDaysCompleted ?? 0}</div>
+                      <div className="text-[10px] text-gray-400 font-semibold leading-tight mt-0.5">Days Done</div>
+                    </div>
+                    <div className="rounded-xl p-2 text-center" style={{ background: '#f9fafb', border: '1.5px solid #e5e7eb' }}>
+                      <div className="text-xl font-black" style={{ color: theme.accent }}>{u?.totalRecipesGenerated ?? 0}</div>
+                      <div className="text-[10px] text-gray-400 font-semibold leading-tight mt-0.5">Recipes Made</div>
+                    </div>
+                    <div className="rounded-xl p-2 text-center" style={{ background: '#f9fafb', border: '1.5px solid #e5e7eb' }}>
+                      <div className="text-xl font-black" style={{ color: theme.accent }}>{u?.totalExerciseTipsGenerated ?? 0}</div>
+                      <div className="text-[10px] text-gray-400 font-semibold leading-tight mt-0.5">Coach Tips</div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <Button variant="ghost" onClick={onSignOut} className="w-full text-gray-500">
                 Sign Out
@@ -626,7 +676,6 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   // ── Settings tab ─────────────────────────────────────────────────────────
 
   if (activeBottomTab === 'settings') {
-    const habitValue = loadAppState().user?.demPlusHabit ?? '';
     return (
       <EnergyBackground energy={currentDay.energyLevel}>
         <div className="min-h-screen pb-24 p-4">
@@ -639,7 +688,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                   <span className="text-base font-black text-gray-900">Dem+</span>
                   <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ background: theme.accentLight, color: theme.accentText }}>Habit</span>
                 </div>
-                {habitValue ? (
+                {demPlusHabit ? (
                   <button
                     onClick={() => {
                       const state = loadAppState();
@@ -647,6 +696,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                       const updated = { ...state.user, demPlusHabit: '' };
                       saveUserProfile(updated);
                       syncUserProfile(updated).catch(() => {});
+                      setDemPlusHabit('');
                     }}
                     className="text-xs font-bold text-red-400 hover:text-red-600"
                   >
@@ -656,7 +706,8 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
               </div>
               <p className="text-xs text-gray-400 mb-3">One habit. Every day. That&apos;s all it takes.</p>
               <DemPlusHabitInput
-                initialValue={habitValue}
+                key={demPlusHabit || 'empty'}
+                initialValue={demPlusHabit}
                 accentColor={theme.accent}
                 accentDark={theme.accentDark}
                 onSave={(habit) => {
@@ -665,6 +716,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                   const updated = { ...state.user, demPlusHabit: habit };
                   saveUserProfile(updated);
                   syncUserProfile(updated);
+                  setDemPlusHabit(habit);
                 }}
               />
             </Card>
@@ -713,19 +765,75 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 <span className="text-xs text-gray-400">Dress up your Mascot</span>
               </div>
               <WardrobeSelector
-                currentHat={loadAppState().user?.mascotItems?.[0] ?? ''}
+                currentHat={mascotItems[0] ?? ''}
+                currentEyewear={mascotItems[1] ?? ''}
+                currentBadge={mascotItems[2] ?? ''}
                 accentColor={theme.accent}
                 accentLight={theme.accentLight}
                 accentText={theme.accentText}
-                onSelect={(hatId) => {
+                onSelect={(hatId, eyewearId, badgeId) => {
                   const state = loadAppState();
                   if (!state.user) return;
-                  const updated = { ...state.user, mascotItems: hatId ? [hatId] : [] };
+                  const items = [hatId, eyewearId, badgeId];
+                  const updated = { ...state.user, mascotItems: items };
                   saveUserProfile(updated);
-                  syncUserProfile(updated);
+                  syncUserProfile(updated).catch(() => {});
+                  setMascotItems(items);
                 }}
               />
             </Card>
+
+            {/* Subscription */}
+            {(() => {
+              const tier = loadAppState().user?.subscriptionTier ?? 'basic';
+              const TIER_LABELS: Record<string, { label: string; color: string; treats: number }> = {
+                basic:         { label: 'Free',       color: '#6b7280', treats: 2 },
+                ad_free:       { label: 'Ad-Free',    color: '#3b82f6', treats: 2 },
+                premium:       { label: 'Premium',    color: '#8b5cf6', treats: 5 },
+                premium_plus:  { label: 'Premium+',   color: '#f59e0b', treats: 100 },
+              };
+              const current = TIER_LABELS[tier] ?? TIER_LABELS.basic;
+              return (
+                <Card>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-black text-gray-800 text-base">Subscription</h3>
+                    <span className="text-xs font-black px-2.5 py-1 rounded-full text-white" style={{ background: current.color }}>
+                      {current.label}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mb-3">
+                    {tier === 'basic'
+                      ? `You're on the free plan — ${current.treats} Thinky Treats per day.`
+                      : `You're on ${current.label} — ${current.treats === 100 ? 'unlimited' : current.treats} Thinky Treats per day.`}
+                  </p>
+                  {tier === 'basic' && (
+                    <div className="space-y-2">
+                      {[
+                        { id: 'ad_free',      label: 'Ad-Free',   price: '$2 once', treats: '2/day', color: '#3b82f6' },
+                        { id: 'premium',      label: 'Premium',   price: '$5/mo',   treats: '5/day', color: '#8b5cf6' },
+                        { id: 'premium_plus', label: 'Premium+',  price: '$10/mo',  treats: '∞/day', color: '#f59e0b' },
+                      ].map(plan => (
+                        <div key={plan.id} className="flex items-center justify-between rounded-xl px-3 py-2.5" style={{ background: '#f9fafb', border: '1.5px solid #e5e7eb' }}>
+                          <div>
+                            <span className="text-sm font-black" style={{ color: plan.color }}>{plan.label}</span>
+                            <span className="text-xs text-gray-400 ml-2">🍬 {plan.treats}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-gray-500">{plan.price}</span>
+                            <span className="text-[10px] font-black text-gray-300 px-2 py-1 rounded-lg bg-gray-100">Coming soon</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {tier !== 'basic' && (
+                    <div className="rounded-xl px-3 py-2 text-center" style={{ background: '#f9fafb', border: '1.5px solid #e5e7eb' }}>
+                      <p className="text-xs text-gray-400">Manage billing · <span className="font-bold text-gray-300">Stripe portal — coming soon</span></p>
+                    </div>
+                  )}
+                </Card>
+              );
+            })()}
 
             {/* Danger zone */}
             <Card>
@@ -967,7 +1075,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
 
           {/* Accountabuddies */}
           <AccountabuddiesCard
-            habit={loadAppState().user?.demPlusHabit ?? ''}
+            habit={demPlusHabit}
             name={userName}
             accentColor={theme.accent}
             accentDark={theme.accentDark}
@@ -1041,7 +1149,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
               animate={{ color: theme.accent }}
               transition={{ duration: 0.6 }}
             >
-              Dem V2
+              Dem+
             </motion.h1>
             <p className="text-sm text-gray-500 font-semibold">Day {currentDay.dayNumber} of {plan.planLength ?? 3}</p>
           </div>
@@ -1056,7 +1164,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
             >
               <span className="text-xl leading-none">🍬</span>
               <span className="text-2xl font-black" style={{ color: theme.accent }}>{getTreatsRemainingToday()}</span>
-              <span className="text-xs font-bold text-gray-500">/{FREE_DAILY_LIMIT}</span>
+              <span className="text-xs font-bold text-gray-500">/{getEffectiveDailyLimit()}</span>
             </motion.div>
 
             {/* Streak badge */}
@@ -1197,43 +1305,74 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
         </AnimatePresence>
 
         {/* Mascot — clickable to open energy modal, or tickle when day is complete */}
-        <motion.div
-          className="flex justify-center mb-4 cursor-pointer"
-          onClick={() => {
-            if (isComplete) {
-              const msg = TICKLE_MESSAGES[Math.floor(Math.random() * TICKLE_MESSAGES.length)];
-              setTickleMessage(msg);
-              setTimeout(() => setTickleMessage(''), 3000);
-            } else if (!isPastDay && !(currentDay.energyLocked ?? false)) {
-              setShowEnergyModal(true);
-            }
-          }}
-          whileHover={{ scale: isPastDay ? 1 : 1.03 }}
-          whileTap={{ scale: isPastDay ? 1 : 0.97 }}
-          title={isPastDay ? 'Past day — view only' : isComplete ? 'Hehe!' : (currentDay.energyLocked ?? false) ? 'Day complete, energy locked' : 'Tap to change energy level'}
-        >
-          <Mascot
-            key={activePillar}
-            message={tickleMessage || energySetMessage || tabMessage}
-            mood={activePillar === 'mentality' ? 'encouraging' : currentDay.energyLevel === 'high' ? 'excited' : 'happy'}
-            persistent={false}
-            currentEnergy={currentDay.energyLevel}
-            userName={userName}
-            dayNumber={currentDay.dayNumber}
-            completedTasks={Object.entries(currentDay.completed).filter(([, v]) => v).map(([k]) => k)}
-            streak={streak}
-            pillar={activePillar}
-            size={96}
-            hat={loadAppState().user?.mascotItems?.[0]}
-          />
-        </motion.div>
+        <div className="relative flex justify-center mb-4">
+          {/* Floating brain emojis on treat consume */}
+          <AnimatePresence>
+            {showTreatBrains && ['🧠','🧠','🧠','🧠','🧠'].map((_, i) => (
+              <motion.span
+                key={i}
+                className="absolute text-2xl select-none pointer-events-none"
+                style={{ left: `${8 + i * 18}%`, top: '10%', zIndex: 20 }}
+                initial={{ opacity: 0, y: 0 }}
+                animate={{ opacity: [0, 0.85, 0], y: [0, -50, -100], rotate: [0, i % 2 === 0 ? 18 : -18, 0] }}
+                transition={{ delay: i * 0.18, duration: 1.8, ease: 'easeOut' }}
+              >
+                🧠
+              </motion.span>
+            ))}
+          </AnimatePresence>
+
+          <motion.div
+            className="cursor-pointer"
+            onClick={() => {
+              if (isComplete) {
+                const msg = TICKLE_MESSAGES[Math.floor(Math.random() * TICKLE_MESSAGES.length)];
+                setTickleMessage(msg);
+                setTimeout(() => setTickleMessage(''), 3000);
+              } else if (!isPastDay && !(currentDay.energyLocked ?? false)) {
+                setShowEnergyModal(true);
+              }
+            }}
+            whileHover={{ scale: isPastDay ? 1 : 1.03 }}
+            whileTap={{ scale: isPastDay ? 1 : 0.97 }}
+            title={isPastDay ? 'Past day — view only' : isComplete ? 'Hehe!' : (currentDay.energyLocked ?? false) ? 'Day complete, energy locked' : 'Tap to change energy level'}
+          >
+            <Mascot
+              key={activePillar}
+              message={treatEatMessage || tickleMessage || energySetMessage || tabMessage}
+              mood={treatEatMessage ? 'excited' : activePillar === 'mentality' ? 'encouraging' : currentDay.energyLevel === 'high' ? 'excited' : 'happy'}
+              persistent={false}
+              currentEnergy={currentDay.energyLevel}
+              userName={userName}
+              dayNumber={currentDay.dayNumber}
+              completedTasks={Object.entries(currentDay.completed).filter(([, v]) => v).map(([k]) => k)}
+              streak={streak}
+              pillar={activePillar}
+              size={96}
+              hat={mascotItems[0] || undefined}
+              eyewear={mascotItems[1] || undefined}
+              badge={mascotItems[2] || undefined}
+            />
+          </motion.div>
+        </div>
+
+        {/* Ad banner — basic tier only */}
+        {(loadAppState().user?.subscriptionTier ?? 'basic') === 'basic' && (
+          <div
+            className="rounded-2xl px-4 py-2.5 mb-3 flex items-center justify-between"
+            style={{ background: '#f9fafb', border: '1.5px dashed #d1d5db' }}
+          >
+            <p className="text-[11px] text-gray-400 font-semibold">Ad placeholder · Upgrade to remove ads</p>
+            <span className="text-[10px] font-black text-gray-300 px-2 py-1 rounded-lg bg-gray-100 ml-2 whitespace-nowrap">Coming soon</span>
+          </div>
+        )}
 
         {/* Pillar tabs */}
         <PillarTabs
           activePillar={activePillar}
           onPillarChange={setActivePillar}
           completedPillars={currentDay.completed}
-          showHabit={!!(loadAppState().user?.demPlusHabit)}
+          showHabit={!!demPlusHabit}
         />
 
         {/* Pillar content */}
@@ -1284,7 +1423,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
             )}
             {activePillar === 'habit' && (
               <HabitView
-                habit={loadAppState().user?.demPlusHabit ?? ''}
+                habit={demPlusHabit}
                 isCompleted={currentDay.completed.habit ?? false}
                 onToggle={toggleHabit}
                 onSaveHabit={(h) => {
@@ -1293,6 +1432,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                   const updated = { ...state.user, demPlusHabit: h };
                   saveUserProfile(updated);
                   syncUserProfile(updated).catch(() => {});
+                  setDemPlusHabit(h);
                 }}
                 isPastDay={isPastDay}
               />
@@ -1510,6 +1650,11 @@ function DevPanel({
             <button onClick={() => onAction('reset')}
               className="w-full text-left text-white text-xs py-1.5 px-2 rounded-lg hover:bg-gray-700">
               Reset Day Tasks
+            </button>
+            <div className="border-t border-gray-700 my-1" />
+            <button onClick={() => devResetTreats()}
+              className="w-full text-left text-xs py-1.5 px-2 rounded-lg hover:bg-gray-700 text-amber-400">
+              Reset Treats 🍬
             </button>
           </motion.div>
         )}
@@ -1757,14 +1902,25 @@ function ExerciseView({ day, isCompleted, onToggle, onEditPrefs, isPastDay, onAI
 
 // ─── Mentality view ──────────────────────────────────────────────────────────────
 
+const PROTOCOL_STYLE: Record<string, { bg: string; text: string; border: string }> = {
+  'CBT':                { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
+  'DBT':                { bg: '#faf5ff', text: '#7e22ce', border: '#e9d5ff' },
+  'Somatic':            { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' },
+  'Positive Psychology':{ bg: '#fefce8', text: '#a16207', border: '#fde68a' },
+};
+
 function MentalityView({ day, isCompleted, onToggle, onEditPrefs }: {
   day: DayPlan; isCompleted: boolean; onToggle: () => void; onEditPrefs: () => void;
 }) {
+  const check   = day.mentality.check;
+  const proto   = (check as { protocol?: string }).protocol ?? 'CBT';
+  const pStyle  = PROTOCOL_STYLE[proto] ?? PROTOCOL_STYLE['CBT'];
+
   return (
     <Card>
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-3">
         <div>
-          <div className="flex items-center gap-2 mb-0.5">
+          <div className="flex items-center gap-2 mb-1">
             <Brain className="w-5 h-5 text-dem-purple-500" />
             <h3 className="text-xl font-black text-gray-900">Mental Check-In</h3>
             <button
@@ -1775,14 +1931,22 @@ function MentalityView({ day, isCompleted, onToggle, onEditPrefs }: {
               <Settings2 className="w-3.5 h-3.5" />
             </button>
           </div>
-          <p className="text-sm font-semibold text-dem-purple-500">{day.mentality.check.title}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-dem-purple-500">{check.title}</p>
+            <span
+              className="text-[10px] font-black px-2 py-0.5 rounded-full border"
+              style={{ background: pStyle.bg, color: pStyle.text, borderColor: pStyle.border }}
+            >
+              {proto}
+            </span>
+          </div>
         </div>
         <motion.button
           onClick={onToggle}
           className="w-11 h-11 rounded-xl flex items-center justify-center border-2 transition-colors"
           style={{
-            background:   isCompleted ? '#22c55e' : 'transparent',
-            borderColor:  isCompleted ? '#22c55e'  : '#d1d5db',
+            background:  isCompleted ? '#22c55e' : 'transparent',
+            borderColor: isCompleted ? '#22c55e' : '#d1d5db',
           }}
           whileTap={{ scale: 0.9 }}
         >
@@ -1792,23 +1956,24 @@ function MentalityView({ day, isCompleted, onToggle, onEditPrefs }: {
 
       <div className="bg-dem-purple-50 p-5 rounded-2xl mb-3">
         <div className="flex justify-center mb-3">
-          <Sparkles className="w-9 h-9 text-dem-purple-400" />
+          <span className="text-3xl">{check.emoji}</span>
         </div>
         <p className="text-gray-800 leading-relaxed text-base text-center mb-3">
-          {day.mentality.check.content}
+          {check.content}
         </p>
         <div className="flex items-center justify-center gap-1.5 text-sm text-gray-500">
           <Clock className="w-4 h-4" />
-          <span>{day.mentality.check.duration}</span>
+          <span>{check.duration}</span>
         </div>
       </div>
 
-      <div className="p-4 rounded-2xl" style={{ background: '#fef9c3', border: '2px solid #fde047' }}>
-        <p className="text-sm text-gray-700 text-center font-semibold leading-relaxed flex items-center justify-center gap-1.5">
-          <Lightbulb className="w-4 h-4 flex-shrink-0 text-yellow-500" />
-          Mentality is the glue. Without it, diet and exercise don't stick.
-        </p>
-      </div>
+      <AIMentalityGuide
+        checkId={check.id}
+        title={check.title}
+        protocol={proto}
+        energyLevel={day.energyLevel}
+        dayNumber={day.dayNumber}
+      />
     </Card>
   );
 }

@@ -35,8 +35,8 @@ export default function BottomNav({ activeTab, onTabChange, accentColor = '#22c5
               {isActive && (
                 <motion.div
                   layoutId="bottom-nav-indicator"
-                  className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-[3px] rounded-b-full"
-                  style={{ backgroundColor: accentColor }}
+                  className="absolute top-0 w-10 h-[3px] rounded-b-full"
+                  style={{ backgroundColor: accentColor, left: 'calc(50% - 20px)' }}
                   transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                 />
               )}

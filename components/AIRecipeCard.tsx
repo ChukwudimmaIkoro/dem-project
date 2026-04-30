@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChefHat, Clock, Zap, ChevronDown, Sparkles, Sunrise, Sun, Moon, Coffee, Lightbulb, type LucideIcon } from 'lucide-react';
-import { getCachedRecipe, setCachedRecipe, CachedRecipe } from '@/lib/storage';
+import { getCachedRecipe, setCachedRecipe, CachedRecipe, incrementUserStat } from '@/lib/storage';
 import { hasTreatsLeft, useTreat, getTreatsRemainingToday } from '@/lib/thinkyTreats';
 
 interface AIRecipeCardProps {
@@ -44,6 +44,12 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
     if (cached) setRecipe(cached);
   }, [dayNumber, mealType]);
 
+  useEffect(() => {
+    const refresh = () => setTreatsLeft(getTreatsRemainingToday());
+    window.addEventListener('treats-updated', refresh);
+    return () => window.removeEventListener('treats-updated', refresh);
+  }, []);
+
   const handleGenerate = async () => {
     if (locked || foods.length === 0) return;
     if (!hasTreatsLeft()) return;
@@ -61,6 +67,7 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
       if (data.success && data.recipe) {
         setRecipe(data.recipe);
         setCachedRecipe(dayNumber, mealType, data.recipe);
+        incrementUserStat('totalRecipesGenerated');
         setExpanded(true);
         onLoaded?.();
       } else {
@@ -100,7 +107,7 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
         </div>
 
         {!recipe && !locked && (
-          treatsLeft > 0 ? (
+          loading || treatsLeft > 0 ? (
             <motion.button
               onClick={handleGenerate}
               disabled={loading || foods.length === 0}
@@ -123,14 +130,14 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
                 ) : (
                   <motion.span key="idle" className="flex items-center gap-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                     <Sparkles className="w-3 h-3" />
-                    Suggest meal · {treatsLeft} treat{treatsLeft !== 1 ? 's' : ''} left
+                    🍬 Suggest meal · {treatsLeft} treat{treatsLeft !== 1 ? 's' : ''} left
                   </motion.span>
                 )}
               </AnimatePresence>
             </motion.button>
           ) : (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-amber-50 border border-amber-200 text-amber-700">
-              🍬 Out of treats — resets tomorrow
+              🍬 Out of Treats! Resets tomorrow.
             </div>
           )
         )}
@@ -225,8 +232,8 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
                     className="text-xs rounded-xl px-2.5 py-1.5"
                     style={{ background: 'rgba(255,255,255,0.7)' }}
                   >
-                    <span className="font-bold">{ing.amount}</span>{' '}
-                    <span className="text-gray-600">{ing.item}</span>
+                    <span className="font-bold text-gray-900">{ing.amount}</span>{' '}
+                    <span className="font-bold text-gray-900">{ing.item}</span>
                   </motion.div>
                 ))}
               </div>

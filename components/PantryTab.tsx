@@ -7,6 +7,7 @@ import {
   loadPantry, addPantryItem, removePantryItem, classifyMealTypes,
   getPantryHighlight, setPantryHighlight, PantryItem, MealType,
 } from '@/lib/pantry';
+import { syncPantry } from '@/lib/supabaseStorage';
 import { Card } from './Card';
 
 const MEAL_LABELS: { id: MealType; label: string; emoji: string }[] = [
@@ -55,13 +56,19 @@ export default function PantryTab({ accentColor, accentDark, accentLight, accent
   const handleAdd = () => {
     const trimmed = draft.trim();
     if (!trimmed || mealTypes.length === 0) return;
-    setItems(addPantryItem(trimmed, mealTypes));
+    const updated = addPantryItem(trimmed, mealTypes);
+    setItems(updated);
+    syncPantry(updated).catch(() => {});
     setDraft('');
     setMealTypes([]);
     setShowChips(false);
   };
 
-  const handleRemove = (id: string) => setItems(removePantryItem(id));
+  const handleRemove = (id: string) => {
+    const updated = removePantryItem(id);
+    setItems(updated);
+    syncPantry(updated).catch(() => {});
+  };
 
   const handleHighlightToggle = () => {
     const next = !highlight;

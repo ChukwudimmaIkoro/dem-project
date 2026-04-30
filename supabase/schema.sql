@@ -16,14 +16,22 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   dummy_currency          INTEGER DEFAULT 0,
   longest_streak          INTEGER DEFAULT 0,
   tutorials_seen          TEXT[] DEFAULT '{}',
-  dem_plus_habit          TEXT,
-  mascot_items            TEXT[] DEFAULT '{}',
-  created_at              TIMESTAMPTZ DEFAULT NOW()
+  dem_plus_habit                TEXT,
+  mascot_items                  TEXT[] DEFAULT '{}',
+  subscription_tier             TEXT DEFAULT 'basic',
+  total_days_completed          INTEGER DEFAULT 0,
+  total_recipes_generated       INTEGER DEFAULT 0,
+  total_exercise_tips_generated INTEGER DEFAULT 0,
+  created_at                    TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Run these on existing databases that predate the above columns:
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS dem_plus_habit TEXT;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS mascot_items TEXT[] DEFAULT '{}';
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS subscription_tier TEXT DEFAULT 'basic';
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS total_days_completed INTEGER DEFAULT 0;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS total_recipes_generated INTEGER DEFAULT 0;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS total_exercise_tips_generated INTEGER DEFAULT 0;
 
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 

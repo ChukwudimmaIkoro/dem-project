@@ -7,6 +7,8 @@ import {
   saveUserProfile as lsSaveUserProfile,
   saveCurrentPlan as lsSaveCurrentPlan,
 } from './storage';
+import { PantryItem, savePantry } from './pantry';
+import { getTreatsCloudPayload, restoreTreatsFromCloud, TREATS_CLOUD_KEY } from './thinkyTreats';
 
 // User profile
 
@@ -15,19 +17,23 @@ export async function syncUserProfile(user: UserProfile): Promise<void> {
   if (!authUser) return;
 
   await supabase.from('user_profiles').upsert({
-    id:                     authUser.id,
-    name:                   user.name,
-    goals:                  user.goals ?? [],
-    selected_foods:         user.selectedFoods ?? [],
-    selected_exercises:     user.selectedExercises ?? [],
-    selected_mentality:     user.selectedMentality ?? [],
-    no_food_preference:     user.noFoodPreference ?? false,
-    no_exercise_preference: user.noExercisePreference ?? false,
-    no_mentality_preference:user.noMentalityPreference ?? false,
-    longest_streak:         user.longestStreak ?? 0,
-    dem_plus_habit:         user.demPlusHabit ?? null,
-    mascot_items:           user.mascotItems ?? [],
-    created_at:             user.createdAt,
+    id:                             authUser.id,
+    name:                           user.name,
+    goals:                          user.goals ?? [],
+    selected_foods:                 user.selectedFoods ?? [],
+    selected_exercises:             user.selectedExercises ?? [],
+    selected_mentality:             user.selectedMentality ?? [],
+    no_food_preference:             user.noFoodPreference ?? false,
+    no_exercise_preference:         user.noExercisePreference ?? false,
+    no_mentality_preference:        user.noMentalityPreference ?? false,
+    longest_streak:                 user.longestStreak ?? 0,
+    dem_plus_habit:                 user.demPlusHabit ?? null,
+    mascot_items:                   user.mascotItems ?? [],
+    subscription_tier:              user.subscriptionTier ?? 'basic',
+    total_days_completed:           user.totalDaysCompleted ?? 0,
+    total_recipes_generated:        user.totalRecipesGenerated ?? 0,
+    total_exercise_tips_generated:  user.totalExerciseTipsGenerated ?? 0,
+    created_at:                     user.createdAt,
   });
 
   // Keep localStorage in sync too
@@ -47,18 +53,22 @@ export async function loadUserProfile(): Promise<UserProfile | null> {
   if (!data) return null;
 
   return {
-    name:                   data.name,
-    goals:                  data.goals ?? [],
-    selectedFoods:          data.selected_foods ?? [],
-    selectedExercises:      data.selected_exercises ?? [],
-    selectedMentality:      data.selected_mentality ?? [],
-    noFoodPreference:       data.no_food_preference ?? false,
-    noExercisePreference:   data.no_exercise_preference ?? false,
-    noMentalityPreference:  data.no_mentality_preference ?? false,
-    longestStreak:          data.longest_streak ?? 0,
-    demPlusHabit:           data.dem_plus_habit ?? undefined,
-    mascotItems:            data.mascot_items ?? [],
-    createdAt:              data.created_at,
+    name:                        data.name,
+    goals:                       data.goals ?? [],
+    selectedFoods:               data.selected_foods ?? [],
+    selectedExercises:           data.selected_exercises ?? [],
+    selectedMentality:           data.selected_mentality ?? [],
+    noFoodPreference:            data.no_food_preference ?? false,
+    noExercisePreference:        data.no_exercise_preference ?? false,
+    noMentalityPreference:       data.no_mentality_preference ?? false,
+    longestStreak:               data.longest_streak ?? 0,
+    demPlusHabit:                data.dem_plus_habit ?? undefined,
+    mascotItems:                 data.mascot_items ?? [],
+    subscriptionTier:            data.subscription_tier ?? 'basic',
+    totalDaysCompleted:          data.total_days_completed ?? 0,
+    totalRecipesGenerated:       data.total_recipes_generated ?? 0,
+    totalExerciseTipsGenerated:  data.total_exercise_tips_generated ?? 0,
+    createdAt:                   data.created_at,
   };
 }
 
@@ -168,6 +178,27 @@ export async function getCloudCachedExercise(exerciseId: string, energyLevel: st
 
 export async function setCloudCachedExercise(exerciseId: string, energyLevel: string, coaching: CachedExerciseCoach): Promise<void> {
   return setCachedValue(`exercise-${exerciseId}-${energyLevel}`, coaching);
+}
+
+// Pantry
+
+export async function syncPantry(items: PantryItem[]): Promise<void> {
+  return setCachedValue('pantry-items', { items });
+}
+
+export async function loadPantryFromCloud(): Promise<PantryItem[] | null> {
+  const result = await getCachedValue<{ items: PantryItem[] }>('pantry-items');
+  return result?.items ?? null;
+}
+
+// Thinky Treats usage (synced so treats don't reset on new device/rebuild)
+
+export async function syncTreats(): Promise<void> {
+  return setCachedValue(TREATS_CLOUD_KEY, getTreatsCloudPayload());
+}
+
+export async function loadTreatsFromCloud(): Promise<{ date: string; used: number } | null> {
+  return getCachedValue<{ date: string; used: number }>(TREATS_CLOUD_KEY);
 }
 
 // Migration: push localStorage data to Supabase on first sign-in

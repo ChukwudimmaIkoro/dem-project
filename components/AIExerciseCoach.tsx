@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dumbbell, Sparkles, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
-import { getCachedExerciseCoach, setCachedExerciseCoach, CachedExerciseCoach } from '@/lib/storage';
+import { getCachedExerciseCoach, setCachedExerciseCoach, CachedExerciseCoach, incrementUserStat } from '@/lib/storage';
 import { hasTreatsLeft, useTreat, getTreatsRemainingToday } from '@/lib/thinkyTreats';
 
 interface AIExerciseCoachProps {
@@ -38,6 +38,12 @@ export default function AIExerciseCoach({
     if (cached) setCoaching(cached);
   }, [exerciseId, energyLevel]);
 
+  useEffect(() => {
+    const refresh = () => setTreatsLeft(getTreatsRemainingToday());
+    window.addEventListener('treats-updated', refresh);
+    return () => window.removeEventListener('treats-updated', refresh);
+  }, []);
+
   const handleGenerate = async () => {
     if (locked) return;
     if (!hasTreatsLeft()) return;
@@ -55,6 +61,7 @@ export default function AIExerciseCoach({
       if (data.success && data.coaching) {
         setCoaching(data.coaching);
         setCachedExerciseCoach(exerciseId, energyLevel, data.coaching);
+        incrementUserStat('totalExerciseTipsGenerated');
         setExpanded(true);
         onLoaded?.();
       } else {
@@ -96,7 +103,7 @@ export default function AIExerciseCoach({
             {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
         ) : !locked ? (
-          treatsLeft > 0 ? (
+          loading || treatsLeft > 0 ? (
             <motion.button
               onClick={handleGenerate}
               disabled={loading}
@@ -110,11 +117,11 @@ export default function AIExerciseCoach({
               ) : (
                 <Sparkles className="w-3.5 h-3.5" />
               )}
-              {loading ? 'Loading...' : `Coach · ${treatsLeft} treat${treatsLeft !== 1 ? 's' : ''}`}
+              {loading ? 'Loading...' : `🍬 Coach · ${treatsLeft} treat${treatsLeft !== 1 ? 's' : ''} left`}
             </motion.button>
           ) : (
             <span className="text-xs font-black px-2 py-1 rounded-lg bg-amber-50 text-amber-600 border border-amber-200">
-              🍬 Out of treats
+              🍬 Out of Treats! Resets tomorrow.
             </span>
           )
         ) : null}
