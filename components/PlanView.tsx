@@ -632,7 +632,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       const tier = action === 'tier_basic' ? 'basic' : action === 'tier_plus' ? 'plus' : 'premium';
       const state = loadAppState();
       if (!state.user) return;
-      const newMascotItems = tier === 'basic' ? ['', '', '', '', '', ''] : state.user.mascotItems;
+      const newMascotItems = tier === 'basic' ? ['', '', '', '', '', ''] : (state.user.mascotItems ?? ['', '', '', '', '', '']);
       const updated = { ...state.user, subscriptionTier: tier as 'basic' | 'plus' | 'premium', mascotItems: newMascotItems };
       saveUserProfile(updated);
       syncUserProfile(updated).catch(() => {});

@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import type { LocalNotificationSchema } from '@capacitor/local-notifications';
 import { loadAppState } from './storage';
 import { getActiveDayIndex, isDayComplete } from './planGenerator';
 
@@ -41,7 +42,7 @@ export async function scheduleNotifications(): Promise<void> {
     }
 
     const now = new Date();
-    const toSchedule = [];
+    const toSchedule: LocalNotificationSchema[] = [];
 
     // 8am daily reminder — always on, repeats every day
     const morning = new Date();
@@ -53,10 +54,6 @@ export async function scheduleNotifications(): Promise<void> {
       title: 'Good morning! 🌅',
       body: 'Ready for today? Set your energy and get started.',
       schedule: { at: morning, repeats: true, every: 'day' as const },
-      sound: null,
-      attachments: null,
-      actionTypeId: '',
-      extra: null,
     });
 
     // 9pm streak warning — only if today isn't complete and 9pm hasn't passed
@@ -70,10 +67,6 @@ export async function scheduleNotifications(): Promise<void> {
           title: "Don't break your streak! 🔥",
           body: "Finish today's goals before midnight to keep it going.",
           schedule: { at: evening },
-          sound: null,
-          attachments: null,
-          actionTypeId: '',
-          extra: null,
         });
       }
     }
