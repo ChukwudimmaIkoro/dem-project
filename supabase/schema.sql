@@ -32,6 +32,7 @@ ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS subscription_tier TEXT DEFAUL
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS total_days_completed INTEGER DEFAULT 0;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS total_recipes_generated INTEGER DEFAULT 0;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS total_exercise_tips_generated INTEGER DEFAULT 0;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
 
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 

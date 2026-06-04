@@ -2,59 +2,78 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { MASCOT_HATS, MASCOT_EYEWEAR, MASCOT_BADGES } from './Mascot';
+import {
+  MASCOT_HATS, MASCOT_EYEWEAR, MASCOT_BADGES,
+  MASCOT_SHOES, MASCOT_BACK_BLING, MASCOT_MINI_BUDDIES,
+} from './Mascot';
 
 interface Props {
-  currentHat: string;
+  currentHat?: string;
   currentEyewear?: string;
   currentBadge?: string;
+  currentShoes?: string;
+  currentBackBling?: string;
+  currentMiniBuddy?: string;
+  userTier?: string;
   accentColor: string;
   accentLight: string;
   accentText: string;
-  onSelect: (hatId: string, eyewearId: string, badgeId: string) => void;
+  onSelect: (hat: string, eyewear: string, badge: string, shoes: string, backBling: string, miniBuddy: string) => void;
 }
 
-type Category = 'hat' | 'eyewear' | 'badge';
+type Category = 'hat' | 'eyewear' | 'badge' | 'shoes' | 'backBling' | 'miniBuddy';
 
 const TABS: { id: Category; label: string; emoji: string }[] = [
-  { id: 'hat',    label: 'Hats',    emoji: '🎩' },
-  { id: 'eyewear', label: 'Eyewear', emoji: '👓' },
-  { id: 'badge',  label: 'Badges',  emoji: '⭐' },
+  { id: 'eyewear',   label: 'Eyewear', emoji: '👓' },
+  { id: 'badge',     label: 'Badges',  emoji: '⭐' },
+  { id: 'shoes',     label: 'Shoes',   emoji: '👟' },
+  { id: 'backBling', label: 'Back',    emoji: '🦸' },
+  { id: 'miniBuddy', label: 'Buddy',   emoji: '💗' },
 ];
 
+function canEquip(itemTier: string, userTier: string): boolean {
+  if (itemTier === 'basic') return true;
+  return userTier === 'plus' || userTier === 'premium';
+}
+
 export default function WardrobeSelector({
-  currentHat, currentEyewear = '', currentBadge = '',
+  currentHat = '', currentEyewear = '', currentBadge = '',
+  currentShoes = '', currentBackBling = '', currentMiniBuddy = '',
+  userTier = 'basic',
   accentColor, accentLight, accentText, onSelect,
 }: Props) {
-  const [tab,      setTab]      = useState<Category>('hat');
-  const [hat,      setHat]      = useState(currentHat);
-  const [eyewear,  setEyewear]  = useState(currentEyewear);
-  const [badge,    setBadge]    = useState(currentBadge);
+  const [tab,        setTab]        = useState<Category>('eyewear');
+  const [hat,        setHat]        = useState(currentHat);
+  const [eyewear,    setEyewear]    = useState(currentEyewear);
+  const [badge,      setBadge]      = useState(currentBadge);
+  const [shoes,      setShoes]      = useState(currentShoes);
+  const [backBling,  setBackBling]  = useState(currentBackBling);
+  const [miniBuddy,  setMiniBuddy]  = useState(currentMiniBuddy);
 
   const choose = (id: string) => {
-    if (tab === 'hat') {
-      const next = hat === id ? '' : id;
-      setHat(next);
-      onSelect(next, eyewear, badge);
-    } else if (tab === 'eyewear') {
-      const next = eyewear === id ? '' : id;
-      setEyewear(next);
-      onSelect(hat, next, badge);
-    } else {
-      const next = badge === id ? '' : id;
-      setBadge(next);
-      onSelect(hat, eyewear, next);
-    }
+    const toggle = (cur: string) => cur === id ? '' : id;
+    if (tab === 'hat')       { const v = toggle(hat);       setHat(v);       onSelect(v, eyewear, badge, shoes, backBling, miniBuddy); }
+    else if (tab === 'eyewear')   { const v = toggle(eyewear);   setEyewear(v);   onSelect(hat, v, badge, shoes, backBling, miniBuddy); }
+    else if (tab === 'badge')     { const v = toggle(badge);     setBadge(v);     onSelect(hat, eyewear, v, shoes, backBling, miniBuddy); }
+    else if (tab === 'shoes')     { const v = toggle(shoes);     setShoes(v);     onSelect(hat, eyewear, badge, v, backBling, miniBuddy); }
+    else if (tab === 'backBling') { const v = toggle(backBling); setBackBling(v); onSelect(hat, eyewear, badge, shoes, v, miniBuddy); }
+    else                          { const v = toggle(miniBuddy); setMiniBuddy(v); onSelect(hat, eyewear, badge, shoes, backBling, v); }
   };
 
-  const items = tab === 'hat' ? MASCOT_HATS : tab === 'eyewear' ? MASCOT_EYEWEAR : MASCOT_BADGES;
-  const selectedId = tab === 'hat' ? hat : tab === 'eyewear' ? eyewear : badge;
+  const allItems = {
+    hat: MASCOT_HATS, eyewear: MASCOT_EYEWEAR, badge: MASCOT_BADGES,
+    shoes: MASCOT_SHOES, backBling: MASCOT_BACK_BLING, miniBuddy: MASCOT_MINI_BUDDIES,
+  };
+  const selectedId = { hat, eyewear, badge, shoes, backBling, miniBuddy }[tab];
+  const items = allItems[tab] as { id: string; name: string; emoji: string; tier: string }[];
+
 
   return (
     <div className="space-y-3">
       {/* Mascot preview */}
       <div className="flex justify-center py-2">
-        <svg width="72" height="72" viewBox="0 0 100 100">
+        <svg width="72" height="72" viewBox="-25 -10 150 130" style={{ overflow: 'visible' }}>
+          {backBling && MASCOT_BACK_BLING.find(b => b.id === backBling)?.svgPath}
           <circle cx="50" cy="50" r="44" fill="#22c55e" />
           <ellipse cx="35" cy="28" rx="13" ry="9" fill="rgba(255,255,255,0.28)" />
           <ellipse cx="34" cy="44" rx="5.5" ry="6.5" fill="white" />
@@ -64,23 +83,24 @@ export default function WardrobeSelector({
           <circle cx="37.5" cy="43.5" r="1.4" fill="white" opacity="0.9" />
           <circle cx="69.5" cy="43.5" r="1.4" fill="white" opacity="0.9" />
           <path d="M 37 57 Q 50 70 63 57" stroke="#1a1a2e" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-          {hat     && MASCOT_HATS.find(h => h.id === hat)?.svgPath}
-          {eyewear && MASCOT_EYEWEAR.find(e => e.id === eyewear)?.svgPath}
-          {badge   && MASCOT_BADGES.find(b => b.id === badge)?.svgPath}
+          {eyewear   && MASCOT_EYEWEAR.find(e => e.id === eyewear)?.svgPath}
+          {badge     && MASCOT_BADGES.find(b => b.id === badge)?.svgPath}
+          {shoes     && MASCOT_SHOES.find(s => s.id === shoes)?.svgPath}
+          {miniBuddy && MASCOT_MINI_BUDDIES.find(m => m.id === miniBuddy)?.svgPath}
         </svg>
       </div>
 
-      {/* Category tabs */}
-      <div className="flex gap-1.5">
+      {/* Category tabs — 2 rows of 3 */}
+      <div className="grid grid-cols-3 gap-1.5">
         {TABS.map(t => (
           <motion.button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className="flex-1 py-1.5 rounded-xl text-xs font-black transition-colors"
+            className="py-1.5 rounded-xl text-xs font-black transition-colors"
             style={{
-              background:  tab === t.id ? accentColor : '#f3f4f6',
-              color:       tab === t.id ? 'white' : '#6b7280',
-              boxShadow:   tab === t.id ? `0 2px 0 0 ${accentColor}88` : '0 2px 0 0 #d1d5db',
+              background: tab === t.id ? accentColor : '#f3f4f6',
+              color:      tab === t.id ? 'white' : '#6b7280',
+              boxShadow:  tab === t.id ? `0 2px 0 0 ${accentColor}88` : '0 2px 0 0 #d1d5db',
             }}
             whileTap={{ scale: 0.95, y: 1, boxShadow: 'none' }}
             transition={{ type: 'spring', stiffness: 500, damping: 30 }}
@@ -91,22 +111,28 @@ export default function WardrobeSelector({
       </div>
 
       {/* Item grid */}
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {items.map(item => {
-          const isOn = selectedId === item.id;
+          const isOn     = selectedId === item.id;
+          const unlocked = canEquip(item.tier, userTier);
           return (
             <motion.button
               key={item.id}
-              onClick={() => choose(item.id)}
-              className="flex flex-col items-center gap-1 py-2 rounded-2xl border-2 transition-colors"
+              onClick={() => unlocked && choose(item.id)}
+              className="flex flex-col items-center gap-1 py-2 rounded-2xl border-2 relative transition-colors"
               style={{
-                background:  isOn ? accentLight : '#f9fafb',
-                borderColor: isOn ? accentColor : '#e5e7eb',
+                background:   isOn ? accentLight : unlocked ? '#f9fafb' : '#f3f4f6',
+                borderColor:  isOn ? accentColor : '#e5e7eb',
+                opacity:      unlocked ? 1 : 0.55,
+                cursor:       unlocked ? 'pointer' : 'default',
               }}
-              whileTap={{ scale: 0.9 }}
+              whileTap={unlocked ? { scale: 0.9 } : {}}
             >
               <span className="text-xl">{item.emoji}</span>
               <span className="text-[9px] font-bold text-gray-500 leading-tight text-center px-0.5">{item.name}</span>
+              {!unlocked && (
+                <span className="absolute top-1 right-1 text-[8px] font-black text-gray-400">🔒 Sub</span>
+              )}
             </motion.button>
           );
         })}

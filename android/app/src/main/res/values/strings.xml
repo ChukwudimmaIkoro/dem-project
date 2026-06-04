@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Dem</string>
+    <string name="title_activity_main">Dem</string>
+    <string name="package_name">com.trydem.app</string>
+    <string name="custom_url_scheme">com.trydem.app</string>
+</resources>

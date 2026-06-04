@@ -9,6 +9,10 @@ import {
   incrementUserStat,
 } from '@/lib/storage';
 import { syncPlan, syncUserProfile, deactivateCloudPlan } from '@/lib/supabaseStorage';
+import { setupNotifications, scheduleNotifications } from '@/lib/notifications';
+import { hapticLight, hapticMedium, hapticSuccess } from '@/lib/haptics';
+import { setEnergyIcon } from '@/lib/dynamicIcon';
+import confetti from 'canvas-confetti';
 import { supabase } from '@/lib/supabase';
 import {
   isDayComplete, calculateStreak,
@@ -44,7 +48,7 @@ import DemPlusHabitInput from './DemPlusHabitInput';
 import PantryTab from './PantryTab';
 import WardrobeSelector from './WardrobeSelector';
 import { getPantryForMeal, getPantryHighlight } from '@/lib/pantry';
-import { getTreatsRemainingToday, FREE_DAILY_LIMIT, getEffectiveDailyLimit, devResetTreats } from '@/lib/thinkyTreats';
+import { getTreatsRemainingToday, FREE_DAILY_LIMIT, getEffectiveDailyLimit, devResetTreats, formatTreatsCount } from '@/lib/thinkyTreats';
 
 // ─── Mascot message pools ────────────────────────────────────────────────────────
 
@@ -163,7 +167,10 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const [demPlusHabit,    setDemPlusHabit]   = useState(() => loadAppState().user?.demPlusHabit ?? '');
   const [mascotItems,     setMascotItems]    = useState(() => loadAppState().user?.mascotItems ?? []);
 
-  const [devUnlocked,  setDevUnlocked]  = useState(DEV_MODE);
+  const [devUnlocked,     setDevUnlocked]     = useState(DEV_MODE);
+  const [subscribedTier,    setSubscribedTier]    = useState<'plus' | 'premium' | null>(null);
+  const [subscriptionTier,  setSubscriptionTier]  = useState<'basic' | 'plus' | 'premium'>(() => loadAppState().user?.subscriptionTier ?? 'basic');
+  const [checkoutLoading,   setCheckoutLoading]   = useState<'plus' | 'premium' | null>(null);
   const konamiProgress = useRef(0);
 
   const homeTutorial           = useTutorial('home');
@@ -221,9 +228,53 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       setShowTreatBrains(true);
       setTimeout(() => setTreatEatMessage(''), 2500);
       setTimeout(() => setShowTreatBrains(false), 2800);
+      hapticLight();
     };
     window.addEventListener('treat-consumed', onTreatConsumed);
     return () => window.removeEventListener('treat-consumed', onTreatConsumed);
+  }, []);
+
+  // Native: request notification permissions + schedule on mount; reschedule on app resume
+  useEffect(() => {
+    setupNotifications();
+    let cleanup: (() => void) | undefined;
+    import('@capacitor/app').then(({ App }) => {
+      const handle = App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) scheduleNotifications();
+      });
+      cleanup = () => { handle.then(h => h.remove()); };
+    }).catch(() => {});
+    return () => { cleanup?.(); };
+  }, []);
+
+  // Check for Stripe redirect success — query Stripe directly, no webhook timing dependency
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('upgrade') !== 'success') return;
+    window.history.replaceState({}, '', window.location.pathname);
+
+    const syncTier = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) return;
+
+      const res = await fetch('/api/stripe/sync-tier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: authUser.id }),
+      }).catch(() => null);
+      if (!res?.ok) return;
+
+      const { tier } = await res.json().catch(() => ({}));
+      if (!tier || tier === 'basic') return;
+
+      const state = loadAppState();
+      if (state.user) saveUserProfile({ ...state.user, subscriptionTier: tier });
+      window.dispatchEvent(new Event('treats-updated'));
+      setSubscriptionTier(tier as 'plus' | 'premium');
+      setSubscribedTier(tier as 'plus' | 'premium');
+      confetti({ particleCount: 80, spread: 80, origin: { x: 0.5, y: 0.45 }, colors: ['#3b82f6', '#8b5cf6', '#FFD700', '#22c55e', '#f97316'] });
+    };
+    syncTier();
   }, []);
 
   // Sync user stats to Supabase whenever a stat is incremented locally
@@ -378,12 +429,17 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
 
     setEnergySetMessage(`${ENERGY_THEME[energy].label} set! Tap me anytime to change.`);
     setTimeout(() => setEnergySetMessage(''), 8000);
+
+    hapticMedium();
+    setEnergyIcon(energy);
+    scheduleNotifications();
   };
 
   const toggleTask = (pillar: 'diet' | 'exercise' | 'mentality') => {
     // Past days and already-checked pillars are immutable
     if (isPastDay) return;
     if (currentDay.completed[pillar]) return;
+    hapticLight();
     const wasComplete = isComplete;
 
     const updatedDays = [...plan.days];
@@ -401,6 +457,8 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
 
     const nowComplete = isDayComplete(updatedDays[currentDayIndex]);
     if (nowComplete && !wasComplete) {
+      hapticSuccess();
+      scheduleNotifications();
       incrementUserStat('totalDaysCompleted');
       const prevDone = currentDayIndex === 0 || isDayComplete(updatedDays[currentDayIndex - 1]);
       if (prevDone) {
@@ -454,6 +512,48 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       deactivateCloudPlan().catch(() => {}); // so bootstrap routes to onboarding on reload
       onReset();
     }
+  };
+
+  const handleUpgrade = async (tier: 'plus' | 'premium') => {
+    if (checkoutLoading) return;
+    setCheckoutLoading(tier);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setCheckoutLoading(null); return; }
+    const priceId = tier === 'plus'
+      ? process.env.NEXT_PUBLIC_STRIPE_PLUS_PRICE_ID
+      : process.env.NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID;
+    const res = await fetch('/api/stripe/create-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        priceId,
+        userId: session.user.id,
+        userEmail: session.user.email,
+        returnUrl: window.location.href,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error('Checkout error:', err);
+      alert('Could not start checkout. Please try again.');
+      setCheckoutLoading(null);
+      return;
+    }
+    const { url } = await res.json();
+    if (url) window.location.href = url;
+    else setCheckoutLoading(null);
+  };
+
+  const handleManageSubscription = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const res = await fetch('/api/stripe/portal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: session.user.id, returnUrl: window.location.href }),
+    });
+    const { url } = await res.json();
+    if (url) window.location.href = url;
   };
 
   const handleDeleteAccount = async () => {
@@ -527,7 +627,20 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   };
 
   // Dev-only quick actions
-  const handleDevAction = (action: 'next' | 'complete' | 'reset') => {
+  const handleDevAction = (action: 'next' | 'complete' | 'reset' | 'tier_basic' | 'tier_plus' | 'tier_premium') => {
+    if (action === 'tier_basic' || action === 'tier_plus' || action === 'tier_premium') {
+      const tier = action === 'tier_basic' ? 'basic' : action === 'tier_plus' ? 'plus' : 'premium';
+      const state = loadAppState();
+      if (!state.user) return;
+      const newMascotItems = tier === 'basic' ? ['', '', '', '', '', ''] : state.user.mascotItems;
+      const updated = { ...state.user, subscriptionTier: tier as 'basic' | 'plus' | 'premium', mascotItems: newMascotItems };
+      saveUserProfile(updated);
+      syncUserProfile(updated).catch(() => {});
+      window.dispatchEvent(new Event('treats-updated'));
+      setSubscriptionTier(tier as 'basic' | 'plus' | 'premium');
+      setMascotItems(newMascotItems);
+      return;
+    }
     if (action === 'next') {
       const allDone = plan.days.every(d => isDayComplete(d));
       const onLastDay = currentDayIndex >= plan.days.length - 1;
@@ -768,13 +881,17 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 currentHat={mascotItems[0] ?? ''}
                 currentEyewear={mascotItems[1] ?? ''}
                 currentBadge={mascotItems[2] ?? ''}
+                currentShoes={mascotItems[3] ?? ''}
+                currentBackBling={mascotItems[4] ?? ''}
+                currentMiniBuddy={mascotItems[5] ?? ''}
+                userTier={subscriptionTier}
                 accentColor={theme.accent}
                 accentLight={theme.accentLight}
                 accentText={theme.accentText}
-                onSelect={(hatId, eyewearId, badgeId) => {
+                onSelect={(hatId, eyewearId, badgeId, shoesId, backBlingId, miniBuddyId) => {
                   const state = loadAppState();
                   if (!state.user) return;
-                  const items = [hatId, eyewearId, badgeId];
+                  const items = [hatId, eyewearId, badgeId, shoesId, backBlingId, miniBuddyId];
                   const updated = { ...state.user, mascotItems: items };
                   saveUserProfile(updated);
                   syncUserProfile(updated).catch(() => {});
@@ -785,16 +902,15 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
 
             {/* Subscription */}
             {(() => {
-              const tier = loadAppState().user?.subscriptionTier ?? 'basic';
-              const TIER_LABELS: Record<string, { label: string; color: string; treats: number }> = {
-                basic:         { label: 'Free',       color: '#6b7280', treats: 2 },
-                ad_free:       { label: 'Ad-Free',    color: '#3b82f6', treats: 2 },
-                premium:       { label: 'Premium',    color: '#8b5cf6', treats: 5 },
-                premium_plus:  { label: 'Premium+',   color: '#f59e0b', treats: 100 },
+              const TIER_LABELS: Record<string, { label: string; color: string; treats: string }> = {
+                basic:   { label: 'Free',    color: '#6b7280', treats: '2/day' },
+                plus:    { label: 'Plus',    color: '#3b82f6', treats: '4/day' },
+                premium: { label: 'Premium', color: '#8b5cf6', treats: '∞/day' },
               };
-              const current = TIER_LABELS[tier] ?? TIER_LABELS.basic;
+              const current = TIER_LABELS[subscriptionTier] ?? TIER_LABELS.basic;
               return (
                 <Card>
+
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-black text-gray-800 text-base">Subscription</h3>
                     <span className="text-xs font-black px-2.5 py-1 rounded-full text-white" style={{ background: current.color }}>
@@ -802,34 +918,50 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                     </span>
                   </div>
                   <p className="text-xs text-gray-400 mb-3">
-                    {tier === 'basic'
-                      ? `You're on the free plan — ${current.treats} Thinky Treats per day.`
-                      : `You're on ${current.label} — ${current.treats === 100 ? 'unlimited' : current.treats} Thinky Treats per day.`}
+                    {subscriptionTier === 'basic'
+                      ? `You're on the free plan — ${current.treats} Thinky Treats.`
+                      : `You're on ${current.label} — ${current.treats} Thinky Treats per day.`}
                   </p>
-                  {tier === 'basic' && (
+                  {subscriptionTier === 'basic' && (
                     <div className="space-y-2">
-                      {[
-                        { id: 'ad_free',      label: 'Ad-Free',   price: '$2 once', treats: '2/day', color: '#3b82f6' },
-                        { id: 'premium',      label: 'Premium',   price: '$5/mo',   treats: '5/day', color: '#8b5cf6' },
-                        { id: 'premium_plus', label: 'Premium+',  price: '$10/mo',  treats: '∞/day', color: '#f59e0b' },
-                      ].map(plan => (
-                        <div key={plan.id} className="flex items-center justify-between rounded-xl px-3 py-2.5" style={{ background: '#f9fafb', border: '1.5px solid #e5e7eb' }}>
+                      {([
+                        { id: 'plus'    as const, label: 'Plus',    price: '$0.99/mo', treats: '4/day',  color: '#3b82f6', perks: '4 Thinky Treats/day' },
+                        { id: 'premium' as const, label: 'Premium', price: '$2.99/mo', treats: '∞/day',  color: '#8b5cf6', perks: '∞ Treats/day · Full wardrobe' },
+                      ]).map(plan => {
+                        const isLoading = checkoutLoading === plan.id;
+                        return (
+                        <button
+                          key={plan.id}
+                          onClick={() => handleUpgrade(plan.id)}
+                          disabled={!!checkoutLoading}
+                          className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-left transition-opacity hover:opacity-80 active:opacity-60 disabled:opacity-60"
+                          style={{ background: '#f9fafb', border: `1.5px solid ${plan.color}22` }}
+                        >
                           <div>
                             <span className="text-sm font-black" style={{ color: plan.color }}>{plan.label}</span>
-                            <span className="text-xs text-gray-400 ml-2">🍬 {plan.treats}</span>
+                            <p className="text-[11px] text-gray-400 mt-0.5">{isLoading ? 'Opening checkout…' : plan.perks}</p>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 shrink-0">
                             <span className="text-xs font-bold text-gray-500">{plan.price}</span>
-                            <span className="text-[10px] font-black text-gray-300 px-2 py-1 rounded-lg bg-gray-100">Coming soon</span>
+                            <span className="text-[10px] font-black px-2 py-1 rounded-lg text-white flex items-center gap-1" style={{ background: plan.color }}>
+                              {isLoading
+                                ? <motion.span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.7, ease: 'linear' }} />
+                                : 'Upgrade'}
+                            </span>
                           </div>
-                        </div>
-                      ))}
+                        </button>
+                        );
+                      })}
                     </div>
                   )}
-                  {tier !== 'basic' && (
-                    <div className="rounded-xl px-3 py-2 text-center" style={{ background: '#f9fafb', border: '1.5px solid #e5e7eb' }}>
-                      <p className="text-xs text-gray-400">Manage billing · <span className="font-bold text-gray-300">Stripe portal — coming soon</span></p>
-                    </div>
+                  {subscriptionTier !== 'basic' && (
+                    <button
+                      onClick={handleManageSubscription}
+                      className="w-full rounded-xl px-3 py-2 text-center text-xs font-bold text-gray-500 transition-opacity hover:opacity-70"
+                      style={{ background: '#f9fafb', border: '1.5px solid #e5e7eb' }}
+                    >
+                      Manage subscription
+                    </button>
                   )}
                 </Card>
               );
@@ -1163,8 +1295,8 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
               transition={{ duration: 0.6 }}
             >
               <span className="text-xl leading-none">🍬</span>
-              <span className="text-2xl font-black" style={{ color: theme.accent }}>{getTreatsRemainingToday()}</span>
-              <span className="text-xs font-bold text-gray-500">/{getEffectiveDailyLimit()}</span>
+              <span className="text-2xl font-black" style={{ color: theme.accent }}>{formatTreatsCount(getTreatsRemainingToday())}</span>
+              <span className="text-xs font-bold text-gray-500">/{formatTreatsCount(getEffectiveDailyLimit())}</span>
             </motion.div>
 
             {/* Streak badge */}
@@ -1352,20 +1484,12 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
               hat={mascotItems[0] || undefined}
               eyewear={mascotItems[1] || undefined}
               badge={mascotItems[2] || undefined}
+              shoes={mascotItems[3] || undefined}
+              backBling={mascotItems[4] || undefined}
+              miniBuddy={mascotItems[5] || undefined}
             />
           </motion.div>
         </div>
-
-        {/* Ad banner — basic tier only */}
-        {(loadAppState().user?.subscriptionTier ?? 'basic') === 'basic' && (
-          <div
-            className="rounded-2xl px-4 py-2.5 mb-3 flex items-center justify-between"
-            style={{ background: '#f9fafb', border: '1.5px dashed #d1d5db' }}
-          >
-            <p className="text-[11px] text-gray-400 font-semibold">Ad placeholder · Upgrade to remove ads</p>
-            <span className="text-[10px] font-black text-gray-300 px-2 py-1 rounded-lg bg-gray-100 ml-2 whitespace-nowrap">Coming soon</span>
-          </div>
-        )}
 
         {/* Pillar tabs */}
         <PillarTabs
@@ -1527,6 +1651,54 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
         ) : null}
       </AnimatePresence>
 
+      {/* Subscription success modal */}
+      <AnimatePresence>
+        {subscribedTier && (() => {
+          const tierInfo = {
+            plus:    { label: 'Plus',    color: '#3b82f6', perks: '4 Thinky Treats per day + wardrobe access' },
+            premium: { label: 'Premium', color: '#8b5cf6', perks: '∞ Thinky Treats per day + full wardrobe' },
+          }[subscribedTier];
+          return (
+            <motion.div
+              key="sub-success-modal"
+              className="fixed inset-0 z-[200] flex flex-col items-center justify-center px-6"
+              style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <motion.div
+                initial={{ scale: 0.75, y: 16, opacity: 0 }}
+                animate={{ scale: 1, y: 0, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 340, damping: 24, delay: 0.05 }}
+                className="mb-[-32px] z-10 relative"
+              >
+                <Mascot message="You leveled up! Let's gooo!" mood="excited" currentEnergy="high" persistent size={110} />
+              </motion.div>
+              <motion.div
+                initial={{ scale: 0.85, y: 20, opacity: 0 }}
+                animate={{ scale: 1, y: 0, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 22, delay: 0.1 }}
+                className="bg-white rounded-3xl px-7 pb-6 pt-12 max-w-sm w-full shadow-2xl flex flex-col items-center gap-4"
+              >
+                <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: `${tierInfo.color}1a` }}>
+                  <Sparkles className="w-9 h-9" style={{ color: tierInfo.color }} />
+                </div>
+                <h2 className="text-2xl font-black text-gray-900 text-center">Welcome to {tierInfo.label}!</h2>
+                <p className="text-sm text-gray-500 text-center -mt-2">{tierInfo.perks}</p>
+                <button
+                  onClick={() => { hapticSuccess(); setSubscribedTier(null); }}
+                  className="w-full py-3.5 rounded-2xl text-base font-black text-white transition-opacity hover:opacity-90 active:opacity-75"
+                  style={{ background: tierInfo.color, boxShadow: `0 5px 0 0 ${tierInfo.color}99` }}
+                >
+                  Continue
+                </button>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
+
     </EnergyBackground>
   );
 }
@@ -1615,7 +1787,7 @@ function DevPanel({
 }: {
   show: boolean;
   onToggle: () => void;
-  onAction: (a: 'next' | 'complete' | 'reset') => void;
+  onAction: (a: 'next' | 'complete' | 'reset' | 'tier_basic' | 'tier_plus' | 'tier_premium') => void;
   devUnlocked: boolean;
 }) {
   if (!devUnlocked) return null;
@@ -1655,6 +1827,20 @@ function DevPanel({
             <button onClick={() => devResetTreats()}
               className="w-full text-left text-xs py-1.5 px-2 rounded-lg hover:bg-gray-700 text-amber-400">
               Reset Treats 🍬
+            </button>
+            <div className="border-t border-gray-700 my-1" />
+            <p className="text-gray-500 text-[10px] px-2">Tier</p>
+            <button onClick={() => onAction('tier_basic')}
+              className="w-full text-left text-xs py-1.5 px-2 rounded-lg hover:bg-gray-700 text-gray-300">
+              → Basic (free)
+            </button>
+            <button onClick={() => onAction('tier_plus')}
+              className="w-full text-left text-xs py-1.5 px-2 rounded-lg hover:bg-gray-700 text-blue-400">
+              → Plus
+            </button>
+            <button onClick={() => onAction('tier_premium')}
+              className="w-full text-left text-xs py-1.5 px-2 rounded-lg hover:bg-gray-700 text-purple-400">
+              → Premium
             </button>
           </motion.div>
         )}

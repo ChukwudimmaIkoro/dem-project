@@ -45,7 +45,7 @@ export interface MentalityCheck {
 
 // User Data:
 
-export type SubscriptionTier = 'basic' | 'ad_free' | 'premium' | 'premium_plus';
+export type SubscriptionTier = 'basic' | 'plus' | 'premium';
 
 export interface UserProfile {
   name: string;

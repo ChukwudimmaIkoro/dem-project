@@ -3,10 +3,9 @@ const KEY_PREFIX = 'dem-treats-';
 const CLOUD_KEY  = 'thinky-treats';
 
 const TIER_LIMITS: Record<string, number> = {
-  basic:          2,
-  ad_free:        2,
-  premium:        5,
-  premium_plus: 100,
+  basic:   2,
+  plus:    4,
+  premium: 999,
 };
 
 export function getEffectiveDailyLimit(): number {
@@ -77,6 +76,11 @@ export function restoreTreatsFromCloud(payload: { date: string; used: number }):
   clearTreatsLocally();
   if (payload.date !== todayDateString()) return;
   localStorage.setItem(todayKey(), String(payload.used));
+}
+
+/** Returns '∞' for premium (≥999), otherwise the number as a string. */
+export function formatTreatsCount(n: number): string {
+  return n >= 999 ? '∞' : String(n);
 }
 
 export const FREE_DAILY_LIMIT = FREE_TREATS_PER_DAY;
