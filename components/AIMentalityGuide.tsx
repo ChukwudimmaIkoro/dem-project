@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { getCachedMentalityGuide, setCachedMentalityGuide, CachedMentalityGuide } from '@/lib/storage';
-import { hasTreatsLeft, useTreat, getTreatsRemainingToday } from '@/lib/thinkyTreats';
+import { hasTreatsLeft, useTreat, getTreatsRemainingToday, formatTreatsCount } from '@/lib/thinkyTreats';
 
 interface AIMentalityGuideProps {
   checkId: string;
@@ -105,7 +105,7 @@ export default function AIMentalityGuide({ checkId, title, protocol, energyLevel
               ) : (
                 <Sparkles className="w-3.5 h-3.5" />
               )}
-              {loading ? 'Loading...' : `🍬 Guide me · ${treatsLeft} treat${treatsLeft !== 1 ? 's' : ''} left`}
+              {loading ? 'Loading...' : `🍬 Guide me · ${treatsLeft >= 999 ? '∞ treats left' : `${treatsLeft} treat${treatsLeft !== 1 ? 's' : ''} left`}`}
             </motion.button>
           ) : (
             <span className="text-xs font-black px-2 py-1 rounded-lg bg-amber-50 text-amber-600 border border-amber-200">

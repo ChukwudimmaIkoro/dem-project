@@ -45,3 +45,5 @@ next-env.d.ts
 .claude/
 CLAUDE.md
 MEMORY.md
+.agents/
+skills-lock.json

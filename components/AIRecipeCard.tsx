@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChefHat, Clock, Zap, ChevronDown, Sparkles, Sunrise, Sun, Moon, Coffee, Lightbulb, type LucideIcon } from 'lucide-react';
 import { getCachedRecipe, setCachedRecipe, CachedRecipe, incrementUserStat } from '@/lib/storage';
-import { hasTreatsLeft, useTreat, getTreatsRemainingToday } from '@/lib/thinkyTreats';
+import { hasTreatsLeft, useTreat, getTreatsRemainingToday, formatTreatsCount } from '@/lib/thinkyTreats';
 
 interface AIRecipeCardProps {
   foods: string[];
@@ -130,7 +130,7 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
                 ) : (
                   <motion.span key="idle" className="flex items-center gap-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                     <Sparkles className="w-3 h-3" />
-                    🍬 Suggest meal · {treatsLeft} treat{treatsLeft !== 1 ? 's' : ''} left
+                    🍬 Suggest meal · {treatsLeft >= 999 ? '∞ treats left' : `${treatsLeft} treat${treatsLeft !== 1 ? 's' : ''} left`}
                   </motion.span>
                 )}
               </AnimatePresence>

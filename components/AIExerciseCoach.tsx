@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dumbbell, Sparkles, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { getCachedExerciseCoach, setCachedExerciseCoach, CachedExerciseCoach, incrementUserStat } from '@/lib/storage';
-import { hasTreatsLeft, useTreat, getTreatsRemainingToday } from '@/lib/thinkyTreats';
+import { hasTreatsLeft, useTreat, getTreatsRemainingToday, formatTreatsCount } from '@/lib/thinkyTreats';
 
 interface AIExerciseCoachProps {
   exerciseId: string;
@@ -117,7 +117,7 @@ export default function AIExerciseCoach({
               ) : (
                 <Sparkles className="w-3.5 h-3.5" />
               )}
-              {loading ? 'Loading...' : `🍬 Coach · ${treatsLeft} treat${treatsLeft !== 1 ? 's' : ''} left`}
+              {loading ? 'Loading...' : `🍬 Coach · ${treatsLeft >= 999 ? '∞ treats left' : `${treatsLeft} treat${treatsLeft !== 1 ? 's' : ''} left`}`}
             </motion.button>
           ) : (
             <span className="text-xs font-black px-2 py-1 rounded-lg bg-amber-50 text-amber-600 border border-amber-200">

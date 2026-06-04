@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, TrendingUp, TrendingDown, Minus, AlertTriangle, Sparkles, ChevronDown, Stethoscope, ShieldCheck, Copy, Check as CheckIcon } from 'lucide-react';
 import { getCachedInsight, setCachedInsight, CachedInsight } from '@/lib/storage';
-import { hasTreatsLeft, useTreat, getTreatsRemainingToday } from '@/lib/thinkyTreats';
+import { hasTreatsLeft, useTreat, getTreatsRemainingToday, formatTreatsCount } from '@/lib/thinkyTreats';
 
 interface InsightsProps {
   energyHistory: ('low' | 'medium' | 'high')[];
@@ -195,7 +195,7 @@ export default function AIHealthInsights({
                     exit={{ opacity: 0 }}
                   >
                     <Sparkles className="w-3 h-3" />
-                    🍬 {insight ? 'Refresh' : 'Analyze'} · {treatsLeft} treat{treatsLeft !== 1 ? 's' : ''} left
+                    🍬 {insight ? 'Refresh' : 'Analyze'} · {treatsLeft >= 999 ? '∞ treats left' : `${treatsLeft} treat${treatsLeft !== 1 ? 's' : ''} left`}
                   </motion.span>
                 )}
               </AnimatePresence>
