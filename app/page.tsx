@@ -66,9 +66,16 @@ export default function Home() {
   }, []);
 
   const initAuth = useCallback(() => {
+    // If local state already has a plan + user, show the app instantly while
+    // auth verifies in the background — avoids a full reload flash on resume.
+    const local = loadAppState();
+    if (local.user && local.currentPlan) {
+      setScreen('app');
+    }
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
-        bootstrap(data.user);
+        setAuthUser(data.user);
+        if (!local.user || !local.currentPlan) bootstrap(data.user);
       } else {
         setScreen('auth');
       }

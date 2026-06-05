@@ -451,7 +451,7 @@ export interface MascotBackBling {
 
 export const MASCOT_BACK_BLING: MascotBackBling[] = [
   {
-    id: 'cape', name: 'Cape', emoji: '🦸', tier: 'plus',
+    id: 'cape', name: 'Cape', emoji: '🦸', tier: 'basic',
     svgPath: (
       <g>
         <g>

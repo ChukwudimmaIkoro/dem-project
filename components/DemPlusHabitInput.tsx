@@ -62,7 +62,6 @@ export default function DemPlusHabitInput({ initialValue, accentColor, accentDar
         onKeyDown={e => e.key === 'Enter' && commit()}
         placeholder="e.g. Drink 8 glasses of water"
         maxLength={80}
-        autoFocus
         className="w-full rounded-2xl px-4 py-3 text-sm font-semibold text-gray-800 outline-none border-2 transition-colors"
         style={{ borderColor: draft ? accentColor : '#e5e7eb' }}
       />
