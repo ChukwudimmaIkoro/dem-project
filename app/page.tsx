@@ -83,7 +83,8 @@ export default function Home() {
 
   useEffect(() => {
     // Show landing page until user explicitly continues to the app
-    if (!localStorage.getItem('dem-skip-landing')) {
+    // DEV: waitlist bypassed for testing — re-enable before public launch
+    if (false && !localStorage.getItem('dem-skip-landing')) {
       setScreen('landing');
       return;
     }

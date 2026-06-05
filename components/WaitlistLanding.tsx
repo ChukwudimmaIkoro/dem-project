@@ -154,7 +154,7 @@ export default function WaitlistLanding({ onContinueToAlpha }: WaitlistLandingPr
         </motion.div>
       </div>
 
-      {process.env.NODE_ENV === 'development' && (
+      {(
         <motion.div
           className="mt-10 text-center"
           initial={{ opacity: 0 }}
