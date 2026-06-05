@@ -58,11 +58,17 @@ export default function Home() {
     }
     if (cloudPlan)   saveCurrentPlan(cloudPlan);
     if (cloudPantry) savePantry(cloudPantry);
-    clearTreatsLocally();
-    if (cloudTreats) restoreTreatsFromCloud(cloudTreats);
+    // Only swap treats if cloud actually returned data — avoids wiping local
+    // treats when Supabase is paused/unreachable and cloudTreats comes back null.
+    if (cloudTreats !== null) {
+      clearTreatsLocally();
+      restoreTreatsFromCloud(cloudTreats);
+    }
 
-    // Cloud plan is authoritative — don't let stale localStorage skip onboarding for new users
-    setScreen(cloudPlan ? 'app' : 'onboarding');
+    // Cloud plan is authoritative for new users, but fall back to local if
+    // Supabase was paused/unreachable (cloudPlan null despite existing local data).
+    const local = loadAppState();
+    setScreen(cloudPlan ? 'app' : local.currentPlan ? 'app' : 'onboarding');
   }, []);
 
   const initAuth = useCallback(() => {
