@@ -257,7 +257,7 @@ export default function OnboardingFlow({ userName, onComplete }: OnboardingFlowP
                 Welcome to <span className="text-dem-green-500">Dem</span>!
               </h1>
               <p className="text-gray-500 text-sm mb-4 leading-relaxed">
-                Diet · Exercise · Mentality. Select your goals — we'll tailor your plan around what matters most.
+                Diet · Exercise · Mentality. Select your goals and we'll tailor your plan around what matters most.
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {GOAL_OPTIONS.map(goal => {

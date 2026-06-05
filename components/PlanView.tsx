@@ -798,7 +798,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
             <Card>
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-base font-black text-gray-900">Dem+</span>
+                  <span className="text-base font-black text-gray-900">Dem</span>
                   <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ background: theme.accentLight, color: theme.accentText }}>Habit</span>
                 </div>
                 {demPlusHabit ? (
@@ -875,7 +875,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
             <Card>
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-base font-black text-gray-900">Wardrobe</span>
-                <span className="text-xs text-gray-400">Dress up your Mascot</span>
+                <span className="text-xs text-gray-400">Dress up Dem!</span>
               </div>
               <WardrobeSelector
                 currentHat={mascotItems[0] ?? ''}
@@ -885,6 +885,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 currentBackBling={mascotItems[4] ?? ''}
                 currentMiniBuddy={mascotItems[5] ?? ''}
                 userTier={subscriptionTier}
+                energyLevel={currentDay.energyLevel ?? 'medium'}
                 accentColor={theme.accent}
                 accentLight={theme.accentLight}
                 accentText={theme.accentText}
@@ -919,8 +920,10 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                   </div>
                   <p className="text-xs text-gray-400 mb-3">
                     {subscriptionTier === 'basic'
-                      ? `You're on the free plan — ${current.treats} Thinky Treats.`
-                      : `You're on ${current.label} — ${current.treats} Thinky Treats per day.`}
+                      ? `You're on the Free plan. You get 2/day Thinky Treats!`
+                      : subscriptionTier === 'plus'
+                        ? `You're on the Plus plan. You get 4/day Thinky Treats!`
+                        : `You're on the Premium plan. You get unlimited Thinky Treats!`}
                   </p>
                   {subscriptionTier === 'basic' && (
                     <div className="space-y-2">
@@ -1024,7 +1027,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
               <p className="font-black text-gray-800 text-lg">Day Streak</p>
               <p className="text-gray-500 text-sm mt-1">
                 {planExpired
-                  ? "It's okay to be inconsistent at the start — showing up is the first step."
+                  ? "It's okay to be inconsistent at the start. Showing up is the first step."
                   : streak === 0
                   ? 'Complete today to start your streak!'
                   : `${streak} day${streak !== 1 ? 's' : ''} completed, amazing work!`}
@@ -1116,7 +1119,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                     {allDaysComplete
                       ? 'Tap a length to begin your next streak!'
                       : planExpired
-                      ? 'Choose a plan length to start fresh — same or longer!'
+                      ? 'Choose a plan length to start fresh, same or longer!'
                       : 'Changing mid-plan will restart your current progress.'}
                   </p>
                 </>
@@ -1281,7 +1284,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
               animate={{ color: theme.accent }}
               transition={{ duration: 0.6 }}
             >
-              Dem+
+              Dem
             </motion.h1>
             <p className="text-sm text-gray-500 font-semibold">Day {currentDay.dayNumber} of {plan.planLength ?? 3}</p>
           </div>
@@ -1413,7 +1416,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
             >
               <div className="p-4 text-center text-white">
                 <CheckCircle2 className="w-8 h-8 mx-auto mb-1 text-white" />
-                <p className="font-black text-lg">Day {currentDay.dayNumber} — Completed!</p>
+                <p className="font-black text-lg">Day {currentDay.dayNumber}: Completed!</p>
                 <p className="text-sm opacity-85">You crushed this day. View-only now.</p>
               </div>
             </motion.div>
@@ -1470,7 +1473,6 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
             title={isPastDay ? 'Past day — view only' : isComplete ? 'Hehe!' : (currentDay.energyLocked ?? false) ? 'Day complete, energy locked' : 'Tap to change energy level'}
           >
             <Mascot
-              key={activePillar}
               message={treatEatMessage || tickleMessage || energySetMessage || tabMessage}
               mood={treatEatMessage ? 'excited' : activePillar === 'mentality' ? 'encouraging' : currentDay.energyLevel === 'high' ? 'excited' : 'happy'}
               persistent={false}
@@ -1706,54 +1708,15 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
 // ─── Accountabuddies card ────────────────────────────────────────────────────────
 
 function AccountabuddiesCard({
-  habit, name, accentColor, accentDark, accentLight, accentText,
+  habit: _habit, name: _name, accentColor: _a, accentDark: _b, accentLight: _c, accentText: _d,
 }: {
   habit: string; name: string;
   accentColor: string; accentDark: string; accentLight: string; accentText: string;
 }) {
-  const [copied, setCopied] = useState(false);
-
-  if (!habit) {
-    return (
-      <Card>
-        <p className="font-black text-gray-900 text-sm mb-1">🤝 Accountabuddies</p>
-        <p className="text-xs text-gray-400 leading-relaxed">
-          Set a habit in Settings to get a shareable buddy link. Keep each other on track!
-        </p>
-      </Card>
-    );
-  }
-
-  const link = typeof window !== 'undefined'
-    ? `${window.location.origin}/buddy?habit=${encodeURIComponent(habit)}&name=${encodeURIComponent(name || 'A friend')}`
-    : '';
-
-  const copy = () => {
-    navigator.clipboard.writeText(link).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
   return (
     <Card>
       <p className="font-black text-gray-900 text-sm mb-1">🤝 Accountabuddies</p>
-      <p className="text-xs text-gray-500 mb-3 leading-relaxed">
-        Share this link with someone to build <span className="font-bold">&ldquo;{habit}&rdquo;</span> together.
-      </p>
-      <div className="flex gap-2">
-        <div className="flex-1 rounded-xl px-3 py-2 bg-gray-50 border border-gray-200 text-xs text-gray-400 font-mono truncate">
-          {link}
-        </div>
-        <motion.button
-          onClick={copy}
-          className="px-3 py-2 rounded-xl text-xs font-black text-white flex-shrink-0"
-          style={{ background: copied ? '#16a34a' : accentColor, boxShadow: `0 3px 0 0 ${accentDark}` }}
-          whileTap={{ scale: 0.92, y: 1, boxShadow: 'none' }}
-        >
-          {copied ? '✓ Copied' : 'Copy'}
-        </motion.button>
-      </div>
+      <p className="text-xs text-gray-400 leading-relaxed">Coming soon!</p>
     </Card>
   );
 }

@@ -29,8 +29,8 @@ export const TUTORIALS: Record<string, TutorialSlide[]> = {
     { message: "The longer the streak, the deeper the habit. You've got this!" },
   ],
   planExpired: [
-    { message: "It's okay to be inconsistent at the start — showing up is the first step." },
+    { message: "It's okay to be inconsistent at the start. Showing up is the first step." },
     { message: "Head to the Progress tab to start a fresh plan. You can go for the same 3 days, or level up to something longer!" },
-    { message: "Every attempt builds the habit. Don't give up — Dem will be here when you're ready." },
+    { message: "Every attempt builds the habit. Don't give up. Dem will be here when you're ready." },
   ],
 };

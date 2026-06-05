@@ -5,11 +5,13 @@ import { motion } from 'framer-motion';
 import {
   MASCOT_HATS, MASCOT_EYEWEAR, MASCOT_BADGES,
   MASCOT_SHOES, MASCOT_BACK_BLING, MASCOT_MINI_BUDDIES,
+  ENERGY_CONFIG,
 } from './Mascot';
 
 interface Props {
   currentHat?: string;
   currentEyewear?: string;
+  energyLevel?: 'low' | 'medium' | 'high';
   currentBadge?: string;
   currentShoes?: string;
   currentBackBling?: string;
@@ -39,7 +41,7 @@ function canEquip(itemTier: string, userTier: string): boolean {
 export default function WardrobeSelector({
   currentHat = '', currentEyewear = '', currentBadge = '',
   currentShoes = '', currentBackBling = '', currentMiniBuddy = '',
-  userTier = 'basic',
+  userTier = 'basic', energyLevel = 'medium',
   accentColor, accentLight, accentText, onSelect,
 }: Props) {
   const [tab,        setTab]        = useState<Category>('eyewear');
@@ -74,7 +76,7 @@ export default function WardrobeSelector({
       <div className="flex justify-center py-2">
         <svg width="72" height="72" viewBox="-25 -10 150 130" style={{ overflow: 'visible' }}>
           {backBling && MASCOT_BACK_BLING.find(b => b.id === backBling)?.svgPath}
-          <circle cx="50" cy="50" r="44" fill="#22c55e" />
+          <circle cx="50" cy="50" r="44" fill={ENERGY_CONFIG[energyLevel].color} />
           <ellipse cx="35" cy="28" rx="13" ry="9" fill="rgba(255,255,255,0.28)" />
           <ellipse cx="34" cy="44" rx="5.5" ry="6.5" fill="white" />
           <ellipse cx="66" cy="44" rx="5.5" ry="6.5" fill="white" />
