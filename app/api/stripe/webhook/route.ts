@@ -9,13 +9,18 @@ const PRICE_TO_TIER: Record<string, string> = {
   [process.env.STRIPE_PREMIUM_PRICE_ID ?? '']: 'premium',
 };
 
-async function updateTier(customerId: string, tier: string, resetMascot = false) {
+async function updateTier(
+  customerId: string,
+  tier: string,
+  opts: { resetMascot?: boolean; setEverSubscribed?: boolean } = {},
+) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
   const update: Record<string, unknown> = { subscription_tier: tier };
-  if (resetMascot) update.mascot_items = ['', '', '', '', '', ''];
+  if (opts.resetMascot) update.mascot_items = ['', '', '', '', '', ''];
+  if (opts.setEverSubscribed) update.has_ever_subscribed = true;
   await supabase
     .from('user_profiles')
     .update(update)
@@ -38,19 +43,23 @@ export async function POST(request: NextRequest) {
     const customerId = session.customer as string;
     const sub = await stripe.subscriptions.retrieve(session.subscription as string);
     const priceId = sub.items.data[0].price.id;
-    await updateTier(customerId, PRICE_TO_TIER[priceId] ?? 'basic');
+    const tier = PRICE_TO_TIER[priceId] ?? 'basic';
+    await updateTier(customerId, tier, { setEverSubscribed: tier !== 'basic' });
   }
 
   if (event.type === 'customer.subscription.updated') {
     const sub = event.data.object as Stripe.Subscription;
     const priceId = sub.items.data[0].price.id;
     const newTier = PRICE_TO_TIER[priceId] ?? 'basic';
-    await updateTier(sub.customer as string, newTier, newTier === 'basic');
+    await updateTier(sub.customer as string, newTier, {
+      resetMascot: newTier === 'basic',
+      setEverSubscribed: newTier !== 'basic',
+    });
   }
 
   if (event.type === 'customer.subscription.deleted') {
     const sub = event.data.object as Stripe.Subscription;
-    await updateTier(sub.customer as string, 'basic', true);
+    await updateTier(sub.customer as string, 'basic', { resetMascot: true });
   }
 
   return NextResponse.json({ received: true });

@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
 const RESEND_API_KEY   = process.env.RESEND_FULL_ACCESS_API_KEY!;
 const AUDIENCE_ID      = 'ce4f090e-6752-42d7-9d97-005b6898c72b';
 const FROM_ADDRESS     = 'Dem <noreply@trydem.app>';
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 export async function POST(req: NextRequest) {
   const { email } = await req.json();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: 'Invalid email' }, { status: 400 });
   }
+
+  // Store in Supabase so the signup trigger can set has_waitlisted automatically
+  await supabaseAdmin
+    .from('waitlist_emails')
+    .upsert({ email: email.toLowerCase() }, { onConflict: 'email' });
 
   // Add contact to Resend audience
   const contactRes = await fetch(

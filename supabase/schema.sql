@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   total_days_completed          INTEGER DEFAULT 0,
   total_recipes_generated       INTEGER DEFAULT 0,
   total_exercise_tips_generated INTEGER DEFAULT 0,
+  has_ever_subscribed           BOOLEAN DEFAULT FALSE,
+  has_waitlisted                BOOLEAN DEFAULT FALSE,
   created_at                    TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -33,6 +35,8 @@ ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS total_days_completed INTEGER 
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS total_recipes_generated INTEGER DEFAULT 0;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS total_exercise_tips_generated INTEGER DEFAULT 0;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS has_ever_subscribed BOOLEAN DEFAULT FALSE;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS has_waitlisted BOOLEAN DEFAULT FALSE;
 
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 
@@ -107,20 +111,32 @@ CREATE POLICY "Users can delete own cache"
   ON ai_cache FOR DELETE
   USING (auth.uid() = user_id);
 
--- Auto-create profile row on sign-up
+-- Waitlist emails (stored server-side so signup trigger can check them)
+
+CREATE TABLE IF NOT EXISTS waitlist_emails (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email      TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE waitlist_emails ENABLE ROW LEVEL SECURITY;
+-- No client-facing policies — only accessible via service role key (API routes + trigger)
+
+-- Auto-create profile row on sign-up, and mark has_waitlisted if email was on the list
 
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO user_profiles (id, name)
+  INSERT INTO public.user_profiles (id, name, has_waitlisted)
   VALUES (
     NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'name', '')
+    COALESCE(NEW.raw_user_meta_data->>'name', ''),
+    EXISTS(SELECT 1 FROM public.waitlist_emails WHERE email = LOWER(NEW.email))
   )
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created

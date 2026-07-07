@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChefHat, Clock, Zap, ChevronDown, Sparkles, Sunrise, Sun, Moon, Coffee, Lightbulb, type LucideIcon } from 'lucide-react';
 import { getCachedRecipe, setCachedRecipe, CachedRecipe, incrementUserStat } from '@/lib/storage';
+import { getCloudCachedRecipe, setCloudCachedRecipe } from '@/lib/supabaseStorage';
 import { hasTreatsLeft, useTreat, getTreatsRemainingToday, formatTreatsCount } from '@/lib/thinkyTreats';
+import { supabase } from '@/lib/supabase';
 
 interface AIRecipeCardProps {
   foods: string[];
@@ -40,8 +42,12 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
   const accent = ENERGY_ACCENT[energyLevel];
 
   useEffect(() => {
-    const cached = getCachedRecipe(dayNumber, mealType);
-    if (cached) setRecipe(cached);
+    const local = getCachedRecipe(dayNumber, mealType);
+    if (local) { setRecipe(local); return; }
+    // Fall back to cloud cache (cross-device sync)
+    getCloudCachedRecipe(dayNumber, mealType).then(cloud => {
+      if (cloud) { setRecipe(cloud); setCachedRecipe(dayNumber, mealType, cloud); }
+    }).catch(() => {});
   }, [dayNumber, mealType]);
 
   useEffect(() => {
@@ -53,25 +59,30 @@ export default function AIRecipeCard({ foods, mealType, energyLevel, dayNumber, 
   const handleGenerate = async () => {
     if (locked || foods.length === 0) return;
     if (!hasTreatsLeft()) return;
-    useTreat();
-    setTreatsLeft(getTreatsRemainingToday());
     setLoading(true);
     setError('');
     try {
-      const res  = await fetch('/api/ai-meal', {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/ai-meal', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token && { Authorization: `Bearer ${session.access_token}` }),
+        },
         body: JSON.stringify({ foods, mealType, energyLevel, userName }),
       });
       const data = await res.json();
       if (data.success && data.recipe) {
+        useTreat();
+        setTreatsLeft(getTreatsRemainingToday());
         setRecipe(data.recipe);
         setCachedRecipe(dayNumber, mealType, data.recipe);
+        setCloudCachedRecipe(dayNumber, mealType, data.recipe).catch(() => {});
         incrementUserStat('totalRecipesGenerated');
         setExpanded(true);
         onLoaded?.();
       } else {
-        setError('Could not generate recipe. Try again.');
+        setError(data.error || 'Could not generate recipe. Try again.');
       }
     } catch {
       setError('Network error. Check your connection.');

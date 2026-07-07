@@ -33,6 +33,8 @@ export async function syncUserProfile(user: UserProfile): Promise<void> {
     total_days_completed:           user.totalDaysCompleted ?? 0,
     total_recipes_generated:        user.totalRecipesGenerated ?? 0,
     total_exercise_tips_generated:  user.totalExerciseTipsGenerated ?? 0,
+    has_ever_subscribed:            user.hasEverSubscribed ?? false,
+    has_waitlisted:                 user.hasWaitlisted ?? false,
     created_at:                     user.createdAt,
   });
 
@@ -68,6 +70,8 @@ export async function loadUserProfile(): Promise<UserProfile | null> {
     totalDaysCompleted:          data.total_days_completed ?? 0,
     totalRecipesGenerated:       data.total_recipes_generated ?? 0,
     totalExerciseTipsGenerated:  data.total_exercise_tips_generated ?? 0,
+    hasEverSubscribed:           data.has_ever_subscribed ?? false,
+    hasWaitlisted:               data.has_waitlisted ?? false,
     createdAt:                   data.created_at,
   };
 }

@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dumbbell, Sparkles, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { getCachedExerciseCoach, setCachedExerciseCoach, CachedExerciseCoach, incrementUserStat } from '@/lib/storage';
+import { getCloudCachedExercise, setCloudCachedExercise } from '@/lib/supabaseStorage';
 import { hasTreatsLeft, useTreat, getTreatsRemainingToday, formatTreatsCount } from '@/lib/thinkyTreats';
+import { supabase } from '@/lib/supabase';
 
 interface AIExerciseCoachProps {
   exerciseId: string;
@@ -34,8 +36,11 @@ export default function AIExerciseCoach({
   const accent = ENERGY_ACCENT[energyLevel];
 
   useEffect(() => {
-    const cached = getCachedExerciseCoach(exerciseId, energyLevel);
-    if (cached) setCoaching(cached);
+    const local = getCachedExerciseCoach(exerciseId, energyLevel);
+    if (local) { setCoaching(local); return; }
+    getCloudCachedExercise(exerciseId, energyLevel).then(cloud => {
+      if (cloud) { setCoaching(cloud); setCachedExerciseCoach(exerciseId, energyLevel, cloud); }
+    }).catch(() => {});
   }, [exerciseId, energyLevel]);
 
   useEffect(() => {
@@ -47,25 +52,30 @@ export default function AIExerciseCoach({
   const handleGenerate = async () => {
     if (locked) return;
     if (!hasTreatsLeft()) return;
-    useTreat();
-    setTreatsLeft(getTreatsRemainingToday());
     setLoading(true);
     setError('');
     try {
-      const res  = await fetch('/api/ai-exercise', {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/ai-exercise', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token && { Authorization: `Bearer ${session.access_token}` }),
+        },
         body: JSON.stringify({ exerciseName, description, intensity, energyLevel }),
       });
       const data = await res.json();
       if (data.success && data.coaching) {
+        useTreat();
+        setTreatsLeft(getTreatsRemainingToday());
         setCoaching(data.coaching);
         setCachedExerciseCoach(exerciseId, energyLevel, data.coaching);
+        setCloudCachedExercise(exerciseId, energyLevel, data.coaching).catch(() => {});
         incrementUserStat('totalExerciseTipsGenerated');
         setExpanded(true);
         onLoaded?.();
       } else {
-        setError('Could not load coaching tips. Try again.');
+        setError(data.error || 'Could not load coaching tips. Try again.');
       }
     } catch {
       setError('Network error. Check your connection.');

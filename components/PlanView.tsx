@@ -171,6 +171,16 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   const [subscribedTier,    setSubscribedTier]    = useState<'plus' | 'premium' | null>(null);
   const [subscriptionTier,  setSubscriptionTier]  = useState<'basic' | 'plus' | 'premium'>(() => loadAppState().user?.subscriptionTier ?? 'basic');
   const [checkoutLoading,   setCheckoutLoading]   = useState<'plus' | 'premium' | null>(null);
+
+  // Account settings editing
+  const [editingName,      setEditingName]      = useState(false);
+  const [nameDraft,        setNameDraft]        = useState('');
+  const [nameLoading,      setNameLoading]      = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [newPassword,      setNewPassword]      = useState('');
+  const [confirmPassword,  setConfirmPassword]  = useState('');
+  const [pwLoading,        setPwLoading]        = useState(false);
+  const [accountToast,     setAccountToast]     = useState<{ msg: string; ok: boolean } | null>(null);
   const konamiProgress = useRef(0);
 
   const homeTutorial           = useTutorial('home');
@@ -373,6 +383,10 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   };
 
   useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [activeBottomTab]);
+
+  useEffect(() => {
     if (activePillar !== lastPillar) {
       setTabMessage(getMascotTabMessage(activePillar));
       setLastPillar(activePillar);
@@ -405,8 +419,9 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   // Past days are view-only: user can navigate back but not interact
   const isPastDay       = currentDayIndex < activeDayIdx;
   const allDaysComplete = plan.days.every(d => isDayComplete(d));
-  // Plan expired = real time has passed last day but plan was never fully completed
-  const planExpired     = !allDaysComplete && activeDayIdx >= (plan.planLength ?? 3) - 1 && activeDayIdx > 0;
+  // Plan expired = calendar has advanced past the last day but plan was never fully completed
+  const rawDayIdx   = Math.floor((Date.now() - new Date(plan.startDate).getTime()) / (1000 * 60 * 60 * 24));
+  const planExpired = !allDaysComplete && rawDayIdx >= (plan.planLength ?? 3);
 
   // Handlers
 
@@ -545,15 +560,63 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   };
 
   const handleManageSubscription = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-    const res = await fetch('/api/stripe/portal', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: session.user.id, returnUrl: window.location.href }),
-    });
-    const { url } = await res.json();
-    if (url) window.location.href = url;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: session.user.id, returnUrl: window.location.href }),
+      });
+      if (!res.ok) throw new Error('Portal request failed');
+      const { url } = await res.json();
+      if (url) window.location.href = url;
+      else throw new Error('No portal URL returned');
+    } catch {
+      showAccountToast('Could not open billing portal. Please try again.', false);
+    }
+  };
+
+  const showAccountToast = (msg: string, ok: boolean) => {
+    setAccountToast({ msg, ok });
+    setTimeout(() => setAccountToast(null), 3000);
+  };
+
+  const handleSaveName = async () => {
+    const trimmed = nameDraft.trim();
+    if (!trimmed) return;
+    setNameLoading(true);
+    const { error } = await supabase.auth.updateUser({ data: { name: trimmed } });
+    if (error) {
+      showAccountToast('Could not update name.', false);
+    } else {
+      const state = loadAppState();
+      if (state.user) {
+        const updated = { ...state.user, name: trimmed };
+        saveUserProfile(updated);
+        syncUserProfile(updated).catch(() => {});
+      }
+      setUserName(trimmed);
+      setEditingName(false);
+      showAccountToast('Display name updated!', true);
+    }
+    setNameLoading(false);
+  };
+
+  const handleSavePassword = async () => {
+    if (newPassword.length < 8) { showAccountToast('Password must be at least 8 characters.', false); return; }
+    if (newPassword !== confirmPassword) { showAccountToast('Passwords do not match.', false); return; }
+    setPwLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      showAccountToast('Could not update password.', false);
+    } else {
+      setChangingPassword(false);
+      setNewPassword('');
+      setConfirmPassword('');
+      showAccountToast('Password updated!', true);
+    }
+    setPwLoading(false);
   };
 
   const handleDeleteAccount = async () => {
@@ -834,41 +897,109 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
               />
             </Card>
 
-            {/* Account settings — name/password change (coming soon) */}
+            {/* Account settings */}
             <Card>
               <h3 className="font-black text-gray-800 text-base mb-4">Account Settings</h3>
+              <div className="space-y-4">
 
-              <div className="space-y-3">
+                {/* Display name */}
                 <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1 block">
-                    Display Name
-                  </label>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      disabled
-                      defaultValue={authUserName || userName || ''}
-                      placeholder="Your name"
-                      className="flex-1 rounded-xl px-3 py-2.5 text-sm text-gray-400 bg-gray-50 border-2 border-gray-100 outline-none"
-                    />
-                    <span className="text-[10px] font-bold text-gray-300 whitespace-nowrap">Coming soon</span>
-                  </div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1 block">Display Name</label>
+                  {editingName ? (
+                    <div className="space-y-2">
+                      <input
+                        value={nameDraft}
+                        onChange={e => setNameDraft(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleSaveName()}
+                        placeholder="Your name"
+                        className="w-full rounded-xl px-3 py-2.5 text-sm text-gray-800 bg-white border-2 outline-none"
+                        style={{ borderColor: theme.accent }}
+                      />
+                      <div className="flex gap-2">
+                        <motion.button onClick={handleSaveName} disabled={nameLoading || !nameDraft.trim()}
+                          className="flex-1 py-2 rounded-xl text-xs font-black text-white"
+                          style={{ background: theme.accent, opacity: nameLoading || !nameDraft.trim() ? 0.6 : 1 }}
+                          whileTap={{ scale: 0.97 }}>
+                          {nameLoading ? 'Saving...' : 'Save'}
+                        </motion.button>
+                        <motion.button onClick={() => setEditingName(false)}
+                          className="px-4 py-2 rounded-xl text-xs font-black text-gray-500 bg-gray-100"
+                          whileTap={{ scale: 0.97 }}>
+                          Cancel
+                        </motion.button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 items-center">
+                      <div className="flex-1 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 border-2 border-gray-100">
+                        {authUserName || userName || 'Not set'}
+                      </div>
+                      <motion.button onClick={() => { setNameDraft(authUserName || userName || ''); setEditingName(true); }}
+                        className="px-3 py-2.5 rounded-xl text-xs font-black text-gray-500 bg-gray-100"
+                        whileTap={{ scale: 0.97 }}>
+                        Edit
+                      </motion.button>
+                    </div>
+                  )}
                 </div>
 
+                {/* Password */}
                 <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1 block">
-                    Password
-                  </label>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      disabled
-                      type="password"
-                      defaultValue="••••••••"
-                      className="flex-1 rounded-xl px-3 py-2.5 text-sm text-gray-400 bg-gray-50 border-2 border-gray-100 outline-none"
-                    />
-                    <span className="text-[10px] font-bold text-gray-300 whitespace-nowrap">Coming soon</span>
-                  </div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1 block">Password</label>
+                  {changingPassword ? (
+                    <div className="space-y-2">
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        placeholder="New password (min 6 chars)"
+                        className="w-full rounded-xl px-3 py-2.5 text-sm text-gray-800 bg-white border-2 outline-none"
+                        style={{ borderColor: theme.accent }}
+                      />
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleSavePassword()}
+                        placeholder="Confirm new password"
+                        className="w-full rounded-xl px-3 py-2.5 text-sm text-gray-800 bg-white border-2 outline-none"
+                        style={{ borderColor: confirmPassword && confirmPassword !== newPassword ? '#ef4444' : confirmPassword === newPassword && confirmPassword ? '#22c55e' : '#e5e7eb' }}
+                      />
+                      <div className="flex gap-2">
+                        <motion.button onClick={handleSavePassword} disabled={pwLoading || !newPassword || !confirmPassword}
+                          className="flex-1 py-2 rounded-xl text-xs font-black text-white"
+                          style={{ background: theme.accent, opacity: pwLoading || !newPassword || !confirmPassword ? 0.6 : 1 }}
+                          whileTap={{ scale: 0.97 }}>
+                          {pwLoading ? 'Saving...' : 'Update Password'}
+                        </motion.button>
+                        <motion.button onClick={() => { setChangingPassword(false); setNewPassword(''); setConfirmPassword(''); }}
+                          className="px-4 py-2 rounded-xl text-xs font-black text-gray-500 bg-gray-100"
+                          whileTap={{ scale: 0.97 }}>
+                          Cancel
+                        </motion.button>
+                      </div>
+                    </div>
+                  ) : (
+                    <motion.button onClick={() => setChangingPassword(true)}
+                      className="w-full py-2.5 rounded-xl text-xs font-black text-gray-600 bg-gray-100 border-2 border-gray-100"
+                      whileTap={{ scale: 0.97 }}>
+                      Change Password
+                    </motion.button>
+                  )}
                 </div>
               </div>
+
+              {/* Toast */}
+              <AnimatePresence>
+                {accountToast && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}
+                    className="mt-3 px-3 py-2 rounded-xl text-xs font-bold text-center"
+                    style={{ background: accountToast.ok ? '#dcfce7' : '#fef2f2', color: accountToast.ok ? '#15803d' : '#dc2626' }}>
+                    {accountToast.msg}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </Card>
 
             {/* Mascot Wardrobe */}

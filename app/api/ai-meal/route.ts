@@ -1,7 +1,14 @@
 import { callClaude } from '@/lib/ai';
+import { checkAndUseTreat } from '@/lib/treatServerCheck';
 import { NextRequest } from 'next/server';
 
 export async function POST(req: NextRequest) {
+  const token = (req.headers.get('authorization') ?? '').replace('Bearer ', '');
+  const treatCheck = await checkAndUseTreat(token);
+  if (!treatCheck.ok) {
+    return Response.json({ success: false, error: treatCheck.error }, { status: treatCheck.status });
+  }
+
   try {
     const { foods, mealType, energyLevel, userName } = await req.json();
 
@@ -55,13 +62,9 @@ Use 4-7 ingredients. Quantities must be realistic (e.g. '2 cups', '1 tbsp', '3 o
     if (start === -1 || end === -1) throw new Error('No JSON in response');
     const recipe = JSON.parse(rawText.slice(start, end + 1));
 
-    return Response.json({ recipe, success: true });
+    return Response.json({ recipe, success: true, newUsed: treatCheck.newUsed });
   } catch (error) {
     console.error('AI meal error:', error);
-    return Response.json({
-      recipe: null,
-      success: false,
-      fallback: true,
-    });
+    return Response.json({ recipe: null, success: false, fallback: true });
   }
 }

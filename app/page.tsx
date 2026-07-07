@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { loadAppState, saveUserProfile, saveCurrentPlan, clearAppState } from '@/lib/storage';
-import { loadUserProfile, loadActivePlan, loadPantryFromCloud, loadTreatsFromCloud, syncTreats } from '@/lib/supabaseStorage';
+import { loadUserProfile, loadActivePlan, loadPantryFromCloud, loadTreatsFromCloud, syncTreats, syncUserProfile } from '@/lib/supabaseStorage';
 import { savePantry } from '@/lib/pantry';
 import { restoreTreatsFromCloud, clearTreatsLocally } from '@/lib/thinkyTreats';
 import { restoreTutorialsSeen } from '@/hooks/useTutorial';
@@ -51,10 +51,12 @@ export default function Home() {
     const cloudTreats = treatsResult.status === 'fulfilled' ? treatsResult.value : null;
     if (cloudUser) {
       const localState = loadAppState();
-      saveUserProfile({
-        ...cloudUser,
-        longestStreak: Math.max(cloudUser.longestStreak ?? 0, localState.user?.longestStreak ?? 0),
-      });
+      const localStreak = localState.user?.longestStreak ?? 0;
+      const cloudStreak = cloudUser.longestStreak ?? 0;
+      const mergedUser = { ...cloudUser, longestStreak: Math.max(cloudStreak, localStreak) };
+      saveUserProfile(mergedUser);
+      // Push merged streak back to cloud if local was higher (e.g. after Supabase pause)
+      if (localStreak > cloudStreak) syncUserProfile(mergedUser).catch(() => {});
     }
     if (cloudPlan)   saveCurrentPlan(cloudPlan);
     if (cloudPantry) savePantry(cloudPantry);

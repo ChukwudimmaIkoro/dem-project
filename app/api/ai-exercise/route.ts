@@ -1,7 +1,14 @@
 import { callClaude } from '@/lib/ai';
+import { checkAndUseTreat } from '@/lib/treatServerCheck';
 import { NextRequest } from 'next/server';
 
 export async function POST(req: NextRequest) {
+  const token = (req.headers.get('authorization') ?? '').replace('Bearer ', '');
+  const treatCheck = await checkAndUseTreat(token);
+  if (!treatCheck.ok) {
+    return Response.json({ success: false, error: treatCheck.error }, { status: treatCheck.status });
+  }
+
   try {
     const { exerciseName, description, intensity, energyLevel } = await req.json();
 
@@ -39,7 +46,7 @@ Keep steps numbered and brief. Adapt tone to energy level: calm for low, encoura
     const cleaned = rawText.replace(/```json|```/g, '').trim();
     const coaching = JSON.parse(cleaned);
 
-    return Response.json({ coaching, success: true });
+    return Response.json({ coaching, success: true, newUsed: treatCheck.newUsed });
   } catch (error) {
     console.error('AI exercise error:', error);
     return Response.json({ coaching: null, success: false });

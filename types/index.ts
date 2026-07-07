@@ -60,6 +60,8 @@ export interface UserProfile {
   demPlusHabit?: string;           // Dem+ single habit the user is building
   mascotItems?: string[];          // [hatId, eyewearId, badgeId] — any slot can be ''
   subscriptionTier?: SubscriptionTier;
+  hasEverSubscribed?: boolean;     // true once user has had any paid subscription (for future permanent unlocks)
+  hasWaitlisted?: boolean;         // true if user joined the waitlist (for future permanent unlocks)
   totalDaysCompleted?: number;
   totalRecipesGenerated?: number;
   totalExerciseTipsGenerated?: number;
