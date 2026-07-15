@@ -33,6 +33,7 @@ export default function AuthModal({ onClose, onSuccess, accentColor, accentDark 
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState('');
   const [resetSent,    setResetSent]    = useState(false);
+  const [confirmSent,  setConfirmSent]  = useState(false);
 
   const switchMode = (m: Mode) => { setMode(m); setError(''); setResetSent(false); };
 
@@ -67,12 +68,25 @@ export default function AuthModal({ onClose, onSuccess, accentColor, accentDark 
 
     try {
       if (mode === 'signup') {
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { name } },
         });
         if (signUpError) throw signUpError;
+
+        // Supabase returns a fake success (no error) for existing emails when email
+        // confirmation is enabled, but identities will be an empty array.
+        if ((data.user?.identities?.length ?? 1) === 0) {
+          setError('An account with this email already exists. Try signing in instead.');
+          return;
+        }
+        // If session is null, email confirmation is required — there's no authenticated
+        // session yet, so don't migrate data or call onSuccess (the user isn't signed in).
+        if (!data.session) {
+          setConfirmSent(true);
+          return;
+        }
 
         // Migrate any existing local data up to Supabase
         const localState = loadAppState();
@@ -100,8 +114,18 @@ export default function AuthModal({ onClose, onSuccess, accentColor, accentDark 
 
       onSuccess();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Something went wrong';
-      setError(msg);
+      const raw = err instanceof Error ? err.message : 'Something went wrong';
+      if (
+        mode === 'signup' &&
+        (raw.toLowerCase().includes('already registered') ||
+         raw.toLowerCase().includes('already been registered') ||
+         raw.toLowerCase().includes('user already exists') ||
+         raw.toLowerCase().includes('email address is already'))
+      ) {
+        setError('An account with this email already exists. Try signing in instead.');
+      } else {
+        setError(raw);
+      }
     } finally {
       setLoading(false);
     }
@@ -199,6 +223,19 @@ export default function AuthModal({ onClose, onSuccess, accentColor, accentDark 
                   </button>
                 </form>
               )}
+            </div>
+          ) : confirmSent ? (
+            <div className="text-center py-6 space-y-3">
+              <p className="text-3xl">📬</p>
+              <p className="font-black text-gray-900">Check your inbox</p>
+              <p className="text-sm text-gray-500">We sent a confirmation link to <span className="font-bold">{email}</span>. Click it to activate your account.</p>
+              <button
+                onClick={() => { setConfirmSent(false); switchMode('signin'); }}
+                className="text-sm font-black mt-2"
+                style={{ color: accentColor }}
+              >
+                ← Back to sign in
+              </button>
             </div>
           ) : (
             <>
