@@ -6,6 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'public',
   server: {
     url: 'https://trydem.app',
+    allowNavigation: ['checkout.stripe.com', 'billing.stripe.com'],
   },
   plugins: {
     LocalNotifications: {

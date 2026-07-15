@@ -298,7 +298,9 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   }, []);
 
   // Background sync — every plan state change writes to Supabase (fire and forget).
-  // Also updates longestStreak on the user profile if the current streak is a new high.
+  // Also updates longestStreak and historicalStreak on the user profile if either hit
+  // a new high — these live permanently on the user, not the plan, so a plan reset,
+  // device switch, or Supabase hiccup can never claw back an unlock already earned.
   useEffect(() => {
     if (!plan) return;
     syncPlan(plan).catch(() => {});
@@ -306,10 +308,14 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     const gray           = plan.days.slice(0, activeIdx).some(d => !isDayComplete(d));
     const currentStreak  = (gray ? 0 : (plan.carryOverStreak ?? 0)) + calculateStreak(plan, activeIdx);
     const state          = loadAppState();
-    if (state.user && currentStreak > (state.user.longestStreak ?? 0)) {
-      const updatedUser = { ...state.user, longestStreak: currentStreak };
-      saveUserProfile(updatedUser);
-      syncUserProfile(updatedUser).catch(() => {});
+    if (state.user) {
+      const newLongest     = Math.max(state.user.longestStreak ?? 0, currentStreak);
+      const newHistorical  = Math.max(state.user.historicalStreak ?? 0, plan.historicalStreak ?? 0);
+      if (newLongest > (state.user.longestStreak ?? 0) || newHistorical > (state.user.historicalStreak ?? 0)) {
+        const updatedUser = { ...state.user, longestStreak: newLongest, historicalStreak: newHistorical };
+        saveUserProfile(updatedUser);
+        syncUserProfile(updatedUser).catch(() => {});
+      }
     }
   }, [plan]);
 
@@ -768,7 +774,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
   // ── Account tab ──────────────────────────────────────────────────────────
 
   if (activeBottomTab === 'account') {
-    const displayInitial  = (authUserName || authUserEmail || 'D')[0].toUpperCase();
+    const displayInitial  = (userName || authUserName || authUserEmail || 'D')[0].toUpperCase();
     const longestStreak   = loadAppState().user?.longestStreak ?? 0;
     return (
       <EnergyBackground energy={currentDay.energyLevel}>
@@ -786,7 +792,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 </div>
                 <div className="min-w-0">
                   <p className="font-black text-gray-900 text-base truncate">
-                    {authUserName || userName || 'Dem User'}
+                    {userName || authUserName || 'Dem User'}
                   </p>
                   <p className="text-xs text-gray-400 truncate">{authUserEmail}</p>
                 </div>
@@ -932,9 +938,9 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                   ) : (
                     <div className="flex gap-2 items-center">
                       <div className="flex-1 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 border-2 border-gray-100">
-                        {authUserName || userName || 'Not set'}
+                        {userName || authUserName || 'Not set'}
                       </div>
-                      <motion.button onClick={() => { setNameDraft(authUserName || userName || ''); setEditingName(true); }}
+                      <motion.button onClick={() => { setNameDraft(userName || authUserName || ''); setEditingName(true); }}
                         className="px-3 py-2.5 rounded-xl text-xs font-black text-gray-500 bg-gray-100"
                         whileTap={{ scale: 0.97 }}>
                         Edit
@@ -1137,8 +1143,11 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
     const energyHistory     = plan.days.map(d => d.energyLevel);
     const completionHistory = plan.days.map(d => d.completed);
     const planLength         = plan.planLength ?? 3;
-    // Streak goal selector unlocks after first full streak, or when plan is done/expired
-    const streakGoalUnlocked = (plan.historicalStreak ?? 0) > 0 || allDaysComplete || planExpired;
+    // Streak goal selector unlocks after first full streak, or when plan is done/expired.
+    // Checks the permanent user.historicalStreak (survives plan resets/device switches),
+    // not just the current plan's copy, which resets whenever a new plan is generated.
+    const permanentHistoricalStreak = loadAppState().user?.historicalStreak ?? 0;
+    const streakGoalUnlocked = (plan.historicalStreak ?? 0) > 0 || permanentHistoricalStreak > 0 || allDaysComplete || planExpired;
 
     return (
       <EnergyBackground energy={currentDay.energyLevel}>
