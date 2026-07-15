@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
 import {
-  loadPantry, addPantryItem, removePantryItem, classifyMealTypes,
+  loadPantry, addPantryItem, removePantryItem, classifyMealTypes, isBlockedPantryItem,
   getPantryHighlight, setPantryHighlight, PantryItem, MealType,
 } from '@/lib/pantry';
 import { syncPantry } from '@/lib/supabaseStorage';
@@ -31,6 +31,7 @@ export default function PantryTab({ accentColor, accentDark, accentLight, accent
   const [mealTypes, setMealTypes] = useState<MealType[]>([]);
   const [showChips, setShowChips] = useState(false);
   const [highlight, setHighlight] = useState(false);
+  const [error,     setError]     = useState('');
 
   useEffect(() => {
     setItems(loadPantry());
@@ -39,6 +40,7 @@ export default function PantryTab({ accentColor, accentDark, accentLight, accent
 
   const handleDraftChange = (val: string) => {
     setDraft(val);
+    setError('');
     if (val.trim()) {
       const classified = classifyMealTypes(val);
       setMealTypes(classified);
@@ -56,12 +58,17 @@ export default function PantryTab({ accentColor, accentDark, accentLight, accent
   const handleAdd = () => {
     const trimmed = draft.trim();
     if (!trimmed || mealTypes.length === 0) return;
+    if (isBlockedPantryItem(trimmed)) {
+      setError("That doesn't look like a real food item — try adding real ingredients or groceries.");
+      return;
+    }
     const updated = addPantryItem(trimmed, mealTypes);
     setItems(updated);
     syncPantry(updated).catch(() => {});
     setDraft('');
     setMealTypes([]);
     setShowChips(false);
+    setError('');
   };
 
   const handleRemove = (id: string) => {
@@ -117,6 +124,10 @@ export default function PantryTab({ accentColor, accentDark, accentLight, accent
             <Plus className="w-5 h-5" />
           </motion.button>
         </div>
+
+        {error && (
+          <p className="text-xs font-semibold text-red-500 mt-2">{error}</p>
+        )}
 
         {/* Meal type chips — appear once user starts typing */}
         <AnimatePresence>

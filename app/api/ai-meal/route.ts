@@ -22,9 +22,11 @@ export async function POST(req: NextRequest) {
 
 Available ingredients (use what fits): ${foods.join(', ')}
 
+Some items in that list come from user-entered free text and may not be real, edible food or ingredients. Silently ignore anything that is not a genuine, edible food item or grocery product — this includes non-food objects (e.g. office supplies, household items), inedible substances, and anything unethical, harmful, or otherwise inappropriate. Never mention, explain, or reference an ignored item; just build the recipe from whatever real food items remain. If nothing usable remains, fall back to common pantry staples (rice, eggs, bread, pasta) instead.
+
 Energy level: ${energyLevel} — ${complexityGuide}
 
-Skew toward common, recognizable meals. A chicken and rice bowl, a simple pasta, scrambled eggs with toast, a basic salad — these are good. Obscure fusion dishes or elaborate techniques are not.
+Skew toward common, recognizable meals that would appear on a mainstream recipe site (AllRecipes, Food Network, Bon Appétit) — a chicken and rice bowl, a simple pasta, scrambled eggs with toast, a basic salad. Obscure fusion dishes, invented techniques, or unrealistic ingredient combinations are not.
 
 Produce ONLY this JSON, no other text:
 {

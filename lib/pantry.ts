@@ -57,6 +57,24 @@ export function savePantry(items: PantryItem[]): void {
   localStorage.setItem(PANTRY_KEY, JSON.stringify(items));
 }
 
+// ─── Non-food / inappropriate input guard ────────────────────────────────────
+// Pantry items are free text and get inserted directly into the AI recipe prompt
+// as "available ingredients" — reject obvious non-food or unethical entries here
+// so the recipe prompt never even sees them (the prompt itself also ignores
+// anything non-food as a second layer, see app/api/ai-meal/route.ts).
+const BLOCKED_PANTRY_TERMS = [
+  'pencil', 'eraser', 'lead', 'crayon', 'marker', 'pen', 'paper', 'glue', 'staple',
+  'plastic', 'metal', 'glass', 'rock', 'rubber', 'battery', 'soap', 'detergent', 'bleach',
+  'body part', 'corpse', 'cadaver', 'human', 'blood', 'organ', 'flesh', 'bone',
+  'poison', 'drug', 'pill', 'medication', 'chemical',
+];
+
+export function isBlockedPantryItem(name: string): boolean {
+  const lower = name.trim().toLowerCase();
+  if (!lower) return false;
+  return BLOCKED_PANTRY_TERMS.some(term => lower.includes(term));
+}
+
 export function addPantryItem(name: string, mealTypes: MealType[]): PantryItem[] {
   const items = loadPantry();
   const trimmed = name.trim();
