@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { isPrelaunchTester } from '@/lib/prelaunchGate';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -12,6 +13,14 @@ export async function POST(request: NextRequest) {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
+
+    // Pre-launch gate: verify the caller's *actual* session email (never trust the
+    // client-supplied userEmail directly) before letting anyone start checkout.
+    const token = (request.headers.get('authorization') ?? '').replace('Bearer ', '');
+    const { data: { user: authUser } } = await supabase.auth.getUser(token);
+    if (!isPrelaunchTester(authUser?.email)) {
+      return NextResponse.json({ error: 'Subscriptions are not available yet.' }, { status: 403 });
+    }
 
     const { data: profile } = await supabase
       .from('user_profiles')

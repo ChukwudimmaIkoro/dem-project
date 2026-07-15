@@ -20,6 +20,7 @@ import {
   getActiveDayIndex, regenerateDayForEnergy,
 } from '@/lib/planGenerator';
 import { DEV_MODE } from '@/lib/devMode';
+import { isPrelaunchTester } from '@/lib/prelaunchGate';
 import { ENERGY_CONFIG } from './Mascot';
 import { Button } from './Button';
 import { Card } from './Card';
@@ -545,7 +546,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       : process.env.NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID;
     const res = await fetch('/api/stripe/create-checkout', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({
         priceId,
         userId: session.user.id,
@@ -571,7 +572,7 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
       if (!session) return;
       const res = await fetch('/api/stripe/portal', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ userId: session.user.id, returnUrl: window.location.href }),
       });
       if (!res.ok) throw new Error('Portal request failed');
@@ -1008,7 +1009,8 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
               </AnimatePresence>
             </Card>
 
-            {/* Mascot Wardrobe */}
+            {/* Mascot Wardrobe — hidden pre-launch (tier-gated cosmetics tie to Subscription below) */}
+            {isPrelaunchTester(authUserEmail) && (
             <Card>
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-base font-black text-gray-900">Wardrobe</span>
@@ -1037,9 +1039,10 @@ export default function PlanView({ onReset, onSignOut, authUserEmail, authUserNa
                 }}
               />
             </Card>
+            )}
 
-            {/* Subscription */}
-            {(() => {
+            {/* Subscription — hidden pre-launch, testers only */}
+            {isPrelaunchTester(authUserEmail) && (() => {
               const TIER_LABELS: Record<string, { label: string; color: string; treats: string }> = {
                 basic:   { label: 'Free',    color: '#6b7280', treats: '2/day' },
                 plus:    { label: 'Plus',    color: '#3b82f6', treats: '4/day' },
