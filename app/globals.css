@@ -17,6 +17,7 @@
     @apply min-h-screen;
     background: #f0fdf4;
     overscroll-behavior: none;
+    touch-action: manipulation;
     /* Native safe areas — notch, Dynamic Island, home indicator */
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
